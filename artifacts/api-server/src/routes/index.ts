@@ -1,8 +1,28 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import authRouter from "./auth";
+import locationsRouter from "./locations";
+import categoriesRouter from "./categories";
+import inventoryRouter from "./inventory";
+import transactionsRouter from "./transactions";
+import shiftsRouter from "./shifts";
+import transfersRouter from "./transfers";
+import analyticsRouter from "./analytics";
+import momoRouter from "./momo";
+import seedRouter from "./seed";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use("/auth", authRouter);
+router.use("/locations", locationsRouter);
+router.use("/categories", categoriesRouter);
+router.use("/inventory", inventoryRouter);
+router.use("/transactions", transactionsRouter);
+router.use("/shifts", shiftsRouter);
+router.use("/transfers", transfersRouter);
+router.use("/analytics", analyticsRouter);
+router.use("/momo", momoRouter);
+router.use("/seed", seedRouter);
 
 export default router;

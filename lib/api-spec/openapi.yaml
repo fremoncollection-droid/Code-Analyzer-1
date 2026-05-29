@@ -3,20 +3,38 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: MirrorTech POS API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: locations
+    description: Branch locations
+  - name: inventory
+    description: Inventory management
+  - name: categories
+    description: Product categories
+  - name: transactions
+    description: Sales transactions
+  - name: shifts
+    description: Shift scheduling
+  - name: transfers
+    description: Stock transfers
+  - name: analytics
+    description: Dashboard analytics
+  - name: momo
+    description: Mobile money payments
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,7 +42,741 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with username and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [auth]
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshInput"
+      responses:
+        "200":
+          description: New access token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /locations:
+    get:
+      operationId: listLocations
+      tags: [locations]
+      summary: List all active locations
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Location"
+    post:
+      operationId: createLocation
+      tags: [locations]
+      summary: Create a new location
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+
+  /locations/{id}:
+    get:
+      operationId: getLocation
+      tags: [locations]
+      summary: Get a single location
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Location
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+
+  /inventory:
+    get:
+      operationId: listInventory
+      tags: [inventory]
+      summary: List inventory items
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locationId
+          in: query
+          schema:
+            type: string
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: lowStock
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of inventory items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InventoryItem"
+    post:
+      operationId: createInventoryItem
+      tags: [inventory]
+      summary: Create an inventory item
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InventoryInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryItem"
+
+  /inventory/{id}:
+    get:
+      operationId: getInventoryItem
+      tags: [inventory]
+      summary: Get a single inventory item
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Inventory item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryItem"
+    patch:
+      operationId: updateInventoryItem
+      tags: [inventory]
+      summary: Update an inventory item
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InventoryUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryItem"
+    delete:
+      operationId: deleteInventoryItem
+      tags: [inventory]
+      summary: Delete an inventory item
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [categories]
+      summary: List all categories
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+    post:
+      operationId: createCategory
+      tags: [categories]
+      summary: Create a category
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+
+  /transactions:
+    get:
+      operationId: listTransactions
+      tags: [transactions]
+      summary: List transactions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locationId
+          in: query
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          schema:
+            type: string
+        - name: paymentMethod
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionList"
+    post:
+      operationId: createTransaction
+      tags: [transactions]
+      summary: Create a new sale transaction
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /transactions/{id}:
+    get:
+      operationId: getTransaction
+      tags: [transactions]
+      summary: Get a single transaction
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /transactions/{id}/void:
+    post:
+      operationId: voidTransaction
+      tags: [transactions]
+      summary: Void a transaction
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoidInput"
+      responses:
+        "200":
+          description: Voided
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /transactions/{id}/receipt:
+    get:
+      operationId: getReceipt
+      tags: [transactions]
+      summary: Get receipt data for a transaction
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Receipt data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Receipt"
+
+  /transactions/sync:
+    post:
+      operationId: syncOfflineTransactions
+      tags: [transactions]
+      summary: Sync offline transactions from localStorage queue
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncInput"
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResult"
+
+  /shifts:
+    get:
+      operationId: listShifts
+      tags: [shifts]
+      summary: List shifts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locationId
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of shifts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Shift"
+    post:
+      operationId: createShift
+      tags: [shifts]
+      summary: Create / schedule a shift
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShiftInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shift"
+
+  /shifts/{id}:
+    get:
+      operationId: getShift
+      tags: [shifts]
+      summary: Get a single shift
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Shift
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shift"
+    patch:
+      operationId: updateShift
+      tags: [shifts]
+      summary: Update a shift (clock in/out, close, etc.)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShiftUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shift"
+    delete:
+      operationId: deleteShift
+      tags: [shifts]
+      summary: Delete a shift
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /transfers:
+    get:
+      operationId: listTransfers
+      tags: [transfers]
+      summary: List stock transfers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locationId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of transfers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transfer"
+    post:
+      operationId: createTransfer
+      tags: [transfers]
+      summary: Request a stock transfer
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transfer"
+
+  /transfers/{id}/approve:
+    post:
+      operationId: approveTransfer
+      tags: [transfers]
+      summary: Approve a transfer and move stock
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transfer"
+
+  /analytics/summary:
+    get:
+      operationId: getAnalyticsSummary
+      tags: [analytics]
+      summary: Dashboard summary metrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locationId
+          in: query
+          schema:
+            type: string
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [today, week, month, year]
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsSummary"
+
+  /analytics/sales-by-day:
+    get:
+      operationId: getSalesByDay
+      tags: [analytics]
+      summary: Sales breakdown by day
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locationId
+          in: query
+          schema:
+            type: string
+        - name: days
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sales by day
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SalesByDay"
+
+  /analytics/top-items:
+    get:
+      operationId: getTopItems
+      tags: [analytics]
+      summary: Top selling items
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locationId
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Top items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TopItem"
+
+  /momo/initiate:
+    post:
+      operationId: initiateMoMo
+      tags: [momo]
+      summary: Initiate a MoMo payment request
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MoMoInput"
+      responses:
+        "200":
+          description: Payment initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoMoResponse"
+
+  /momo/status/{reference}:
+    get:
+      operationId: getMoMoStatus
+      tags: [momo]
+      summary: Check MoMo payment status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payment status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoMoStatus"
+
+  /seed:
+    post:
+      operationId: seedData
+      tags: [health]
+      summary: Seed demo data
+      responses:
+        "200":
+          description: Seeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +786,522 @@ components:
       required:
         - status
 
+    LoginInput:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    RefreshInput:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [token, refreshToken, user]
+      properties:
+        token:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserProfile"
+
+    UserProfile:
+      type: object
+      required: [id, username, email, role]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        locationId:
+          type: ["string", "null"]
+
+    Location:
+      type: object
+      required: [id, name, isActive]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+
+    LocationInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+
+    Category:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    CategoryInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    InventoryItem:
+      type: object
+      required: [id, name, price, quantity]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        sku:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        price:
+          type: string
+        cost:
+          type: ["string", "null"]
+        quantity:
+          type: integer
+        minQuantity:
+          type: integer
+        locationId:
+          type: ["string", "null"]
+        categoryId:
+          type: ["string", "null"]
+        categoryName:
+          type: ["string", "null"]
+        unit:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+
+    InventoryInput:
+      type: object
+      required: [name, price]
+      properties:
+        name:
+          type: string
+        sku:
+          type: string
+        description:
+          type: string
+        price:
+          type: string
+        cost:
+          type: string
+        quantity:
+          type: integer
+        minQuantity:
+          type: integer
+        locationId:
+          type: string
+        categoryId:
+          type: string
+        unit:
+          type: string
+
+    InventoryUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        sku:
+          type: string
+        description:
+          type: string
+        price:
+          type: string
+        cost:
+          type: string
+        quantity:
+          type: integer
+        minQuantity:
+          type: integer
+        locationId:
+          type: string
+        categoryId:
+          type: string
+        unit:
+          type: string
+        isActive:
+          type: boolean
+
+    CartItem:
+      type: object
+      required: [itemId, name, quantity, price]
+      properties:
+        itemId:
+          type: string
+        name:
+          type: string
+        quantity:
+          type: integer
+        price:
+          type: string
+        total:
+          type: string
+
+    TransactionInput:
+      type: object
+      required: [locationId, items, subtotal, taxAmount, total, paymentMethod]
+      properties:
+        locationId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItem"
+        subtotal:
+          type: string
+        taxAmount:
+          type: string
+        total:
+          type: string
+        paymentMethod:
+          type: string
+          enum: [cash, momo, card]
+        momoPhone:
+          type: string
+        momoNetwork:
+          type: string
+        momoReference:
+          type: string
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        notes:
+          type: string
+
+    Transaction:
+      type: object
+      required: [id, receiptNumber, locationId, items, subtotal, taxAmount, total, paymentMethod, paymentStatus, createdAt]
+      properties:
+        id:
+          type: string
+        receiptNumber:
+          type: string
+        locationId:
+          type: string
+        locationName:
+          type: ["string", "null"]
+        cashierId:
+          type: ["string", "null"]
+        cashierName:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItem"
+        subtotal:
+          type: string
+        taxAmount:
+          type: string
+        total:
+          type: string
+        paymentMethod:
+          type: string
+        paymentStatus:
+          type: string
+        momoPhone:
+          type: ["string", "null"]
+        momoNetwork:
+          type: ["string", "null"]
+        momoReference:
+          type: ["string", "null"]
+        customerName:
+          type: ["string", "null"]
+        customerPhone:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        isVoided:
+          type: boolean
+        voidReason:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    TransactionList:
+      type: object
+      required: [data, total]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+        total:
+          type: integer
+
+    VoidInput:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+
+    Receipt:
+      type: object
+      required: [transaction, location]
+      properties:
+        transaction:
+          $ref: "#/components/schemas/Transaction"
+        location:
+          $ref: "#/components/schemas/Location"
+        graReceiptNumber:
+          type: string
+        qrCode:
+          type: ["string", "null"]
+
+    SyncInput:
+      type: object
+      required: [transactions]
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionInput"
+
+    SyncResult:
+      type: object
+      required: [synced, failed]
+      properties:
+        synced:
+          type: integer
+        failed:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+
+    ShiftInput:
+      type: object
+      required: [userId, locationId, startTime]
+      properties:
+        userId:
+          type: string
+        locationId:
+          type: string
+        startTime:
+          type: string
+        endTime:
+          type: string
+        openingCash:
+          type: string
+        notes:
+          type: string
+
+    ShiftUpdate:
+      type: object
+      properties:
+        endTime:
+          type: string
+        status:
+          type: string
+        openingCash:
+          type: string
+        closingCash:
+          type: string
+        notes:
+          type: string
+
+    Shift:
+      type: object
+      required: [id, userId, locationId, startTime, status]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        userName:
+          type: ["string", "null"]
+        locationId:
+          type: string
+        locationName:
+          type: ["string", "null"]
+        startTime:
+          type: string
+        endTime:
+          type: ["string", "null"]
+        status:
+          type: string
+        openingCash:
+          type: ["string", "null"]
+        closingCash:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    TransferInput:
+      type: object
+      required: [itemId, fromLocationId, toLocationId, quantity]
+      properties:
+        itemId:
+          type: string
+        fromLocationId:
+          type: string
+        toLocationId:
+          type: string
+        quantity:
+          type: integer
+        notes:
+          type: string
+
+    Transfer:
+      type: object
+      required: [id, itemId, fromLocationId, toLocationId, quantity, status]
+      properties:
+        id:
+          type: string
+        itemId:
+          type: string
+        itemName:
+          type: ["string", "null"]
+        fromLocationId:
+          type: string
+        fromLocationName:
+          type: ["string", "null"]
+        toLocationId:
+          type: string
+        toLocationName:
+          type: ["string", "null"]
+        quantity:
+          type: integer
+        status:
+          type: string
+        notes:
+          type: ["string", "null"]
+        requestedById:
+          type: ["string", "null"]
+        approvedById:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    AnalyticsSummary:
+      type: object
+      required: [totalSales, totalRevenue, totalTransactions, averageOrderValue]
+      properties:
+        totalSales:
+          type: number
+        totalRevenue:
+          type: string
+        totalTransactions:
+          type: integer
+        averageOrderValue:
+          type: string
+        cashSales:
+          type: string
+        momoSales:
+          type: string
+        cardSales:
+          type: string
+        lowStockItems:
+          type: integer
+
+    SalesByDay:
+      type: object
+      required: [date, revenue, transactions]
+      properties:
+        date:
+          type: string
+        revenue:
+          type: string
+        transactions:
+          type: integer
+
+    TopItem:
+      type: object
+      required: [itemId, name, quantitySold, revenue]
+      properties:
+        itemId:
+          type: string
+        name:
+          type: string
+        quantitySold:
+          type: integer
+        revenue:
+          type: string
+
+    MoMoInput:
+      type: object
+      required: [phone, network, amount, reference]
+      properties:
+        phone:
+          type: string
+        network:
+          type: string
+          enum: [MTN, Telecel]
+        amount:
+          type: string
+        reference:
+          type: string
+        description:
+          type: string
+
+    MoMoResponse:
+      type: object
+      required: [success, reference, status]
+      properties:
+        success:
+          type: boolean
+        reference:
+          type: string
+        status:
+          type: string
+        message:
+          type: string
+
+    MoMoStatus:
+      type: object
+      required: [reference, status]
+      properties:
+        reference:
+          type: string
+        status:
+          type: string
+        amount:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        message:
+          type: ["string", "null"]

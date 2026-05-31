@@ -333,6 +333,8 @@ export interface MoMoStatus {
   message?: string | null;
 }
 
+export interface SettingsMap {[key: string]: string}
+
 export type ListInventoryParams = {
 locationId?: string;
 categoryId?: string;

@@ -102,7 +102,7 @@ export default function ReceiptModal({ open, onClose, transactionId }: Props) {
             {/* Totals */}
             <div className="space-y-0.5 text-[10px]">
               <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(tx?.subtotal ?? 0)}</span></div>
-              <div className="flex justify-between"><span>VAT (15%)</span><span>{formatCurrency(tx?.taxAmount ?? 0)}</span></div>
+              <div className="flex justify-between"><span>VAT</span><span>{formatCurrency(tx?.taxAmount ?? 0)}</span></div>
               <div className="flex justify-between font-bold text-sm border-t border-dashed pt-1 mt-1">
                 <span>TOTAL</span>
                 <span>{formatCurrency(tx?.total ?? 0)}</span>

@@ -28,6 +28,8 @@ tags:
     description: Dashboard analytics
   - name: momo
     description: Mobile money payments
+  - name: settings
+    description: System configuration
 
 paths:
   /healthz:
@@ -770,6 +772,42 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get system settings
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings map
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsMap"
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update system settings (admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsMap"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsMap"
+        "403":
+          description: Forbidden
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1305,3 +1343,8 @@ components:
           type: ["string", "null"]
         message:
           type: ["string", "null"]
+
+    SettingsMap:
+      type: object
+      additionalProperties:
+        type: string

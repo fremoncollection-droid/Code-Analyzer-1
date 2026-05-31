@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useListLocations, useCreateLocation, useSeedData } from "@workspace/api-client-react";
+import { useListLocations, useCreateLocation, useSeedData, useGetSettings, useUpdateSettings } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Plus, Database, Shield, User, MapPin } from "lucide-react";
+import { Building2, Plus, Database, Shield, User, MapPin, Percent } from "lucide-react";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -17,8 +17,12 @@ export default function SettingsPage() {
   const qc = useQueryClient();
   const [locationDialog, setLocationDialog] = useState(false);
   const [locForm, setLocForm] = useState({ name: "", address: "", phone: "" });
+  const [vatRate, setVatRate] = useState<string>("");
 
   const { data: locations } = useListLocations();
+  const { data: settings } = useGetSettings();
+  const currentVat = settings?.vat_rate ?? "15";
+
   const createLocation = useCreateLocation({
     mutation: {
       onSuccess: () => {
@@ -36,6 +40,15 @@ export default function SettingsPage() {
         toast({ title: "Demo data seeded", description: "Inventory, users and categories have been populated" });
       },
       onError: () => toast({ title: "Seed failed", variant: "destructive" }),
+    },
+  });
+  const updateSettings = useUpdateSettings({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["/api/settings"] });
+        toast({ title: "Settings updated" });
+      },
+      onError: () => toast({ title: "Update failed", variant: "destructive" }),
     },
   });
 
@@ -127,6 +140,41 @@ export default function SettingsPage() {
                 {seedData.isPending ? "Seeding..." : "Seed Data"}
               </Button>
             </div>
+            <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
+              <div className="flex-1">
+                <p className="text-sm font-medium">VAT / Tax Rate</p>
+                <p className="text-xs text-muted-foreground">Current: {currentVat}% VAT</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  value={vatRate}
+                  onChange={e => setVatRate(e.target.value)}
+                  placeholder={currentVat}
+                  className="w-20 h-8 text-sm"
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const rate = parseFloat(vatRate);
+                    if (isNaN(rate) || rate < 0 || rate > 100) {
+                      toast({ title: "Invalid VAT rate", variant: "destructive" });
+                      return;
+                    }
+                    updateSettings.mutate({ data: { vat_rate: String(rate) } });
+                    setVatRate("");
+                  }}
+                  disabled={updateSettings.isPending || !vatRate}
+                >
+                  <Percent className="w-3 h-3 mr-1" /> Save
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -157,7 +205,7 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Tax Rate</span>
-                <span className="font-medium">15% VAT</span>
+                <span className="font-medium">{currentVat}% VAT</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Tax Authority</span>

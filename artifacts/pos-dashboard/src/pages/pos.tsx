@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useListInventory, useListCategories, useCreateTransaction, useInitiateMoMo, useGetMoMoStatus } from "@workspace/api-client-react";
+import { useListInventory, useListCategories, useCreateTransaction, useInitiateMoMo, useGetMoMoStatus, useGetSettings } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -19,7 +19,10 @@ import {
 } from "lucide-react";
 import ReceiptModal from "@/components/receipt-modal";
 
-const TAX_RATE = 0.15;
+function getTaxRate(settings: Record<string, string> | undefined): number {
+  const rate = parseFloat(settings?.vat_rate ?? "15");
+  return isNaN(rate) ? 0.15 : rate / 100;
+}
 
 interface CartItem {
   itemId: string;
@@ -78,6 +81,9 @@ export default function POSPage() {
     search: search || undefined,
     categoryId: selectedCategory ?? undefined,
   });
+  const { data: settings } = useGetSettings();
+  const taxRate = getTaxRate(settings as any);
+  const vatLabel = `VAT (${(taxRate * 100).toFixed(0)}%)`;
 
   const createTx = useCreateTransaction({
     mutation: {
@@ -113,7 +119,7 @@ export default function POSPage() {
 
   // --- Computed ---
   const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  const taxAmount = subtotal * TAX_RATE;
+  const taxAmount = subtotal * taxRate;
   const total = subtotal + taxAmount;
   const momoConfirmed = momoStatus?.status === "successful";
 
@@ -528,7 +534,7 @@ export default function POSPage() {
               <span className="tabular-nums">{formatCurrency(subtotal)}</span>
             </div>
             <div className="flex justify-between text-muted-foreground">
-              <span>VAT (15%)</span>
+              <span>{vatLabel}</span>
               <span className="tabular-nums">{formatCurrency(taxAmount)}</span>
             </div>
             <Separator />
@@ -647,7 +653,7 @@ export default function POSPage() {
           <div className="shrink-0 border-t border-border p-3 space-y-3">
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span className="tabular-nums">{formatCurrency(subtotal)}</span></div>
-              <div className="flex justify-between text-muted-foreground"><span>VAT (15%)</span><span className="tabular-nums">{formatCurrency(taxAmount)}</span></div>
+              <div className="flex justify-between text-muted-foreground"><span>{vatLabel}</span><span className="tabular-nums">{formatCurrency(taxAmount)}</span></div>
               <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-primary tabular-nums">{formatCurrency(total)}</span></div>
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -681,7 +687,7 @@ export default function POSPage() {
             {/* Bill Summary */}
             <div className="bg-muted rounded-lg p-3 space-y-1 text-sm">
               <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span className="tabular-nums">{formatCurrency(subtotal)}</span></div>
-              <div className="flex justify-between text-muted-foreground"><span>VAT (15%)</span><span className="tabular-nums">{formatCurrency(taxAmount)}</span></div>
+              <div className="flex justify-between text-muted-foreground"><span>{vatLabel}</span><span className="tabular-nums">{formatCurrency(taxAmount)}</span></div>
               <Separator className="my-1" />
               <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-primary tabular-nums">{formatCurrency(total)}</span></div>
               <div className="text-xs text-muted-foreground mt-1">{cartItemCount} items · {paymentMethod.toUpperCase()}</div>

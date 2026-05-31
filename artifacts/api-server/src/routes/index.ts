@@ -10,6 +10,7 @@ import transfersRouter from "./transfers";
 import analyticsRouter from "./analytics";
 import momoRouter from "./momo";
 import seedRouter from "./seed";
+import settingsRouter from "./settings";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use("/transfers", transfersRouter);
 router.use("/analytics", analyticsRouter);
 router.use("/momo", momoRouter);
 router.use("/seed", seedRouter);
+router.use("/settings", settingsRouter);
 
 export default router;

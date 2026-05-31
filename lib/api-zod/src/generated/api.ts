@@ -744,3 +744,17 @@ export const SeedDataResponse = zod.object({
 })
 
 
+/**
+ * @summary Get system settings
+ */
+export const GetSettingsResponse = zod.record(zod.string(), zod.string())
+
+
+/**
+ * @summary Update system settings (admin only)
+ */
+export const UpdateSettingsBody = zod.record(zod.string(), zod.string())
+
+export const UpdateSettingsResponse = zod.record(zod.string(), zod.string())
+
+

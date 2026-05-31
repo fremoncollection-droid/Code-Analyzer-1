@@ -6,3 +6,4 @@ export * from "./transactions";
 export * from "./shifts";
 export * from "./transfers";
 export * from "./audit";
+export * from "./settings";

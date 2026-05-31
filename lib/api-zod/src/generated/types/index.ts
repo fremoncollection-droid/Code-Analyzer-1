@@ -33,6 +33,7 @@ export * from './moMoStatus';
 export * from './receipt';
 export * from './refreshInput';
 export * from './salesByDay';
+export * from './settingsMap';
 export * from './shift';
 export * from './shiftInput';
 export * from './shiftUpdate';

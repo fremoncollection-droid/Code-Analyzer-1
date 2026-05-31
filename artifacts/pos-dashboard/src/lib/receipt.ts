@@ -51,7 +51,7 @@ export function formatThermalReceipt(tx: {
     }),
     line,
     `Subtotal${" ".repeat(w - "Subtotal".length - parseFloat(tx.subtotal).toFixed(2).length)}${parseFloat(tx.subtotal).toFixed(2)}`,
-    `VAT (15%)${" ".repeat(w - "VAT (15%)".length - parseFloat(tx.taxAmount).toFixed(2).length)}${parseFloat(tx.taxAmount).toFixed(2)}`,
+    `VAT${" ".repeat(w - 3 - parseFloat(tx.taxAmount).toFixed(2).length)}${parseFloat(tx.taxAmount).toFixed(2)}`,
     dashed,
     `TOTAL${" ".repeat(w - "TOTAL".length - parseFloat(tx.total).toFixed(2).length)}${parseFloat(tx.total).toFixed(2)}`,
     dashed,

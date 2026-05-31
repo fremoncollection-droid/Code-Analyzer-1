@@ -14,8 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, Smartphone,
-  Wifi, WifiOff, CheckCircle2, Printer, X, QrCode, ScanBarcode, ChevronUp,
-  Package, ArrowLeft, Send
+  Wifi, WifiOff, CheckCircle2, X, ScanBarcode, ChevronUp,
+  Package, Send
 } from "lucide-react";
 import ReceiptModal from "@/components/receipt-modal";
 
@@ -37,79 +37,6 @@ function loadOfflineQueue(): any[] {
 }
 function saveOfflineQueue(q: any[]) {
   localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(q));
-}
-
-/**
- * Formats a transaction into a clean 80mm thermal receipt structure.
- * Call this with the finalized transaction data, then send the returned
- * string to an ESC/POS or WebUSB receipt printer.
- */
-export function formatThermalReceipt(tx: {
-  storeName?: string;
-  storeAddress?: string;
-  storePhone?: string;
-  cashierName?: string;
-  receiptNumber: string;
-  graReceiptNumber?: string;
-  items: { name: string; quantity: number; price: string; total?: string }[];
-  subtotal: string;
-  taxAmount: string;
-  total: string;
-  paymentMethod: string;
-  momoPhone?: string;
-  momoNetwork?: string;
-  momoReference?: string;
-  customerName?: string;
-  customerPhone?: string;
-  createdAt?: string;
-}): string {
-  const w = 32; // characters per line for 80mm thermal
-  const center = (s: string) => s.padStart((w + s.length) / 2, " ").padEnd(w, " ");
-  const line = "-".repeat(w);
-  const dashed = "=".repeat(w);
-
-  const lines = [
-    center(tx.storeName?.toUpperCase() ?? "MIRRORTECH"),
-    tx.storeAddress ? center(tx.storeAddress) : "",
-    tx.storePhone ? center(`Tel: ${tx.storePhone}`) : "",
-    "",
-    center("GHANA REVENUE AUTHORITY"),
-    center("E-VAT RECEIPT"),
-    line,
-    `Receipt #: ${tx.receiptNumber}`.slice(0, w),
-    tx.graReceiptNumber ? `GRA Ref: ${tx.graReceiptNumber}`.slice(0, w) : "",
-    `Date: ${tx.createdAt ? new Date(tx.createdAt).toLocaleString("en-GH") : "—"}`.slice(0, w),
-    tx.cashierName ? `Cashier: ${tx.cashierName}`.slice(0, w) : "",
-    tx.customerName ? `Customer: ${tx.customerName}`.slice(0, w) : "",
-    line,
-    "ITEMS",
-    ...tx.items.map(item => {
-      const nameLine = item.name.length > w ? item.name.slice(0, w - 3) + "..." : item.name;
-      const qtyPrice = `${item.quantity} x ${parseFloat(item.price).toFixed(2)}`;
-      const total = parseFloat(item.total ?? "0") || (parseFloat(item.price) * item.quantity);
-      const totalStr = total.toFixed(2);
-      const spaces = Math.max(1, w - nameLine.length - totalStr.length);
-      return `${nameLine}${" ".repeat(spaces)}${totalStr}`;
-    }),
-    line,
-    `Subtotal${" ".repeat(w - "Subtotal".length - parseFloat(tx.subtotal).toFixed(2).length)}${parseFloat(tx.subtotal).toFixed(2)}`,
-    `VAT (15%)${" ".repeat(w - "VAT (15%)".length - parseFloat(tx.taxAmount).toFixed(2).length)}${parseFloat(tx.taxAmount).toFixed(2)}`,
-    dashed,
-    `TOTAL${" ".repeat(w - "TOTAL".length - parseFloat(tx.total).toFixed(2).length)}${parseFloat(tx.total).toFixed(2)}`,
-    dashed,
-    `Payment: ${tx.paymentMethod.toUpperCase()}`.slice(0, w),
-    tx.momoPhone ? `MoMo: ${tx.momoPhone} (${tx.momoNetwork})`.slice(0, w) : "",
-    tx.momoReference ? `Ref: ${tx.momoReference}`.slice(0, w) : "",
-    "",
-    center("Thank you for your purchase!"),
-    center("Goods once sold are not returnable"),
-    center("This is a computer generated receipt"),
-    center("GRA QR CODE"),
-    center("[SIGNATURE AREA]"),
-    "",
-  ];
-
-  return lines.filter(Boolean).join("\n");
 }
 
 export default function POSPage() {
@@ -139,6 +66,10 @@ export default function POSPage() {
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [showScannerHint, setShowScannerHint] = useState(false);
   const [quickScan, setQuickScan] = useState(false);
+  const [cameraScanOpen, setCameraScanOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const scanAnimRef = useRef<number>(0);
 
   // --- Data ---
   const { data: categories } = useListCategories();
@@ -202,6 +133,82 @@ export default function POSPage() {
       setTimeout(() => setQuickScan(false), 600);
     }
   }, [inventory]);
+
+  // --- Camera barcode scanning ---
+  useEffect(() => {
+    if (!cameraScanOpen) return;
+    let stream: MediaStream | null = null;
+    let detector: any = null;
+    let cancelled = false;
+
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        if (cancelled) return;
+        const video = videoRef.current;
+        if (!video) return;
+        video.srcObject = stream;
+        await video.play();
+
+        // Try Barcode Detection API (Chrome on Android, Edge)
+        if ("BarcodeDetector" in window) {
+          const BD = (window as any).BarcodeDetector;
+          detector = new BD({ formats: ["code_128", "ean_13", "ean_8", "code_39", "upc_a", "upc_e"] });
+          scanLoop();
+        } else {
+          // Fallback: canvas-based scanning (simplified frame capture)
+          fallbackScanLoop();
+        }
+      } catch (err) {
+        toast({ title: "Camera error", description: "Could not access camera. Make sure you gave permission.", variant: "destructive" });
+      }
+    }
+
+    async function scanLoop() {
+      if (cancelled || !cameraScanOpen) return;
+      const video = videoRef.current;
+      if (!video || video.readyState < 2) { requestAnimationFrame(scanLoop); return; }
+      try {
+        const results = await detector.detect(video);
+        if (results && results.length > 0) {
+          const barcode = results[0].rawValue;
+          if (barcode) {
+            setSearch(barcode);
+            setCameraScanOpen(false);
+            searchRef.current?.focus();
+            return;
+          }
+        }
+      } catch {}
+      requestAnimationFrame(scanLoop);
+    }
+
+    function fallbackScanLoop() {
+      if (cancelled || !cameraScanOpen) return;
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || video.readyState < 2) { requestAnimationFrame(fallbackScanLoop); return; }
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // We can't decode without a barcode library; let user know
+      // After 8 seconds, close the scanner and prompt to use USB scanner
+      setTimeout(() => {
+        if (cameraScanOpen) {
+          setCameraScanOpen(false);
+          toast({ title: "Barcode scanner not available", description: "Your browser doesn't support camera barcode scanning. Use a USB barcode scanner instead.", variant: "destructive" });
+        }
+      }, 8000);
+    }
+
+    startCamera();
+    return () => {
+      cancelled = true;
+      if (stream) stream.getTracks().forEach(t => t.stop());
+    };
+  }, [cameraScanOpen]);
 
   // --- Keyboard shortcut: F12 = checkout ---
   useEffect(() => {
@@ -343,21 +350,30 @@ export default function POSPage() {
         {/* Toolbar: Search + Categories */}
         <div className="shrink-0 p-3 lg:p-4 border-b border-border space-y-2 bg-card">
           {/* Search bar — always focused, auto-focus after scan */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              ref={searchRef}
-              value={search}
-              onChange={e => handleSearch(e.target.value)}
-              placeholder="Scan barcode or search products..."
-              className={cn("pl-10 text-sm transition-shadow", quickScan && "ring-2 ring-primary")}
-              autoFocus
-            />
-            {search && (
-              <button onClick={() => { setSearch(""); searchRef.current?.focus(); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                <X className="w-3 h-3" />
-              </button>
-            )}
+          <div className="relative flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                ref={searchRef}
+                value={search}
+                onChange={e => handleSearch(e.target.value)}
+                placeholder="Scan barcode or search products..."
+                className={cn("pl-10 text-sm transition-shadow", quickScan && "ring-2 ring-primary")}
+                autoFocus
+              />
+              {search && (
+                <button onClick={() => { setSearch(""); searchRef.current?.focus(); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => setCameraScanOpen(true)}
+              className="shrink-0 w-10 h-10 rounded-lg border border-border bg-muted flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+              title="Scan barcode with camera"
+            >
+              <ScanBarcode className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Category pills */}
@@ -736,6 +752,35 @@ export default function POSPage() {
               {createTx.isPending ? "Processing..." : "Complete Sale"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ============ CAMERA BARCODE SCANNER ============ */}
+      <Dialog open={cameraScanOpen} onOpenChange={setCameraScanOpen}>
+        <DialogContent className="max-w-sm p-0 overflow-hidden">
+          <div className="relative bg-black aspect-[3/4] overflow-hidden">
+            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+            {/* Scan target overlay */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-56 h-32 border-2 border-white/60 rounded-lg relative">
+                <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-primary" />
+                <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-primary" />
+                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-primary" />
+                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-primary" />
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary/60 animate-scan" />
+              </div>
+            </div>
+            <div className="absolute bottom-4 left-0 right-0 text-center">
+              <p className="text-white/80 text-xs">Point barcode at the box</p>
+            </div>
+            <button
+              onClick={() => setCameraScanOpen(false)}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
 

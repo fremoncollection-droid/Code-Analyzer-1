@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useListInventory, useListCategories, useCreateTransaction, useInitiateMoMo, useGetMoMoStatus } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency } from "@/lib/utils";
@@ -6,13 +6,17 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, Smartphone, Wifi, WifiOff, CheckCircle2, Printer, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, Smartphone,
+  Wifi, WifiOff, CheckCircle2, Printer, X, QrCode, ScanBarcode, ChevronUp,
+  Package, ArrowLeft, Send
+} from "lucide-react";
 import ReceiptModal from "@/components/receipt-modal";
 
 const TAX_RATE = 0.15;
@@ -23,24 +27,101 @@ interface CartItem {
   price: number;
   quantity: number;
   unit: string;
+  sku?: string | null;
 }
 
 const OFFLINE_QUEUE_KEY = "pos_offline_queue";
 
 function loadOfflineQueue(): any[] {
-  try {
-    return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
+  try { return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) ?? "[]"); } catch { return []; }
 }
 function saveOfflineQueue(q: any[]) {
   localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(q));
 }
 
+/**
+ * Formats a transaction into a clean 80mm thermal receipt structure.
+ * Call this with the finalized transaction data, then send the returned
+ * string to an ESC/POS or WebUSB receipt printer.
+ */
+export function formatThermalReceipt(tx: {
+  storeName?: string;
+  storeAddress?: string;
+  storePhone?: string;
+  cashierName?: string;
+  receiptNumber: string;
+  graReceiptNumber?: string;
+  items: { name: string; quantity: number; price: string; total?: string }[];
+  subtotal: string;
+  taxAmount: string;
+  total: string;
+  paymentMethod: string;
+  momoPhone?: string;
+  momoNetwork?: string;
+  momoReference?: string;
+  customerName?: string;
+  customerPhone?: string;
+  createdAt?: string;
+}): string {
+  const w = 32; // characters per line for 80mm thermal
+  const center = (s: string) => s.padStart((w + s.length) / 2, " ").padEnd(w, " ");
+  const line = "-".repeat(w);
+  const dashed = "=".repeat(w);
+
+  const lines = [
+    center(tx.storeName?.toUpperCase() ?? "MIRRORTECH"),
+    tx.storeAddress ? center(tx.storeAddress) : "",
+    tx.storePhone ? center(`Tel: ${tx.storePhone}`) : "",
+    "",
+    center("GHANA REVENUE AUTHORITY"),
+    center("E-VAT RECEIPT"),
+    line,
+    `Receipt #: ${tx.receiptNumber}`.slice(0, w),
+    tx.graReceiptNumber ? `GRA Ref: ${tx.graReceiptNumber}`.slice(0, w) : "",
+    `Date: ${tx.createdAt ? new Date(tx.createdAt).toLocaleString("en-GH") : "—"}`.slice(0, w),
+    tx.cashierName ? `Cashier: ${tx.cashierName}`.slice(0, w) : "",
+    tx.customerName ? `Customer: ${tx.customerName}`.slice(0, w) : "",
+    line,
+    "ITEMS",
+    ...tx.items.map(item => {
+      const nameLine = item.name.length > w ? item.name.slice(0, w - 3) + "..." : item.name;
+      const qtyPrice = `${item.quantity} x ${parseFloat(item.price).toFixed(2)}`;
+      const total = parseFloat(item.total ?? "0") || (parseFloat(item.price) * item.quantity);
+      const totalStr = total.toFixed(2);
+      const spaces = Math.max(1, w - nameLine.length - totalStr.length);
+      return `${nameLine}${" ".repeat(spaces)}${totalStr}`;
+    }),
+    line,
+    `Subtotal${" ".repeat(w - "Subtotal".length - parseFloat(tx.subtotal).toFixed(2).length)}${parseFloat(tx.subtotal).toFixed(2)}`,
+    `VAT (15%)${" ".repeat(w - "VAT (15%)".length - parseFloat(tx.taxAmount).toFixed(2).length)}${parseFloat(tx.taxAmount).toFixed(2)}`,
+    dashed,
+    `TOTAL${" ".repeat(w - "TOTAL".length - parseFloat(tx.total).toFixed(2).length)}${parseFloat(tx.total).toFixed(2)}`,
+    dashed,
+    `Payment: ${tx.paymentMethod.toUpperCase()}`.slice(0, w),
+    tx.momoPhone ? `MoMo: ${tx.momoPhone} (${tx.momoNetwork})`.slice(0, w) : "",
+    tx.momoReference ? `Ref: ${tx.momoReference}`.slice(0, w) : "",
+    "",
+    center("Thank you for your purchase!"),
+    center("Goods once sold are not returnable"),
+    center("This is a computer generated receipt"),
+    center("GRA QR CODE"),
+    center("[SIGNATURE AREA]"),
+    "",
+  ];
+
+  return lines.filter(Boolean).join("\n");
+}
+
 export default function POSPage() {
-  const { selectedLocationId } = useAuth();
+  const { user, selectedLocationId } = useAuth();
   const { toast } = useToast();
+  const qc = useQueryClient();
+  const searchRef = useRef<HTMLInputElement>(null);
+  const searchDebounceRef = useRef<number>(0);
+  const lastScanRef = useRef<number>(0);
+  const scanBufferRef = useRef<string>("");
+
+  // --- State ---
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -55,9 +136,13 @@ export default function POSPage() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [showScannerHint, setShowScannerHint] = useState(false);
+  const [quickScan, setQuickScan] = useState(false);
 
+  // --- Data ---
   const { data: categories } = useListCategories();
-  const { data: inventory } = useListInventory({
+  const { data: inventory, isLoading: invLoading } = useListInventory({
     locationId: selectedLocationId ?? undefined,
     search: search || undefined,
     categoryId: selectedCategory ?? undefined,
@@ -72,14 +157,11 @@ export default function POSPage() {
         setCompletedTx(tx);
         setReceiptOpen(true);
         toast({ title: "Sale recorded", description: `Receipt: ${tx.receiptNumber}` });
+        qc.invalidateQueries({ queryKey: ["/api/analytics"] });
       },
       onError: (err: any) => {
-        // If offline, queue it
-        if (!navigator.onLine) {
-          queueOffline();
-        } else {
-          toast({ title: "Sale failed", description: err.message, variant: "destructive" });
-        }
+        if (!navigator.onLine) queueOffline();
+        else toast({ title: "Sale failed", description: err.message, variant: "destructive" });
       },
     },
   });
@@ -90,28 +172,61 @@ export default function POSPage() {
         setMomoRef(r.reference);
         toast({ title: "MoMo request sent", description: r.message });
       },
-      onError: () => {
-        toast({ title: "MoMo failed", description: "Could not initiate payment", variant: "destructive" });
-      },
+      onError: () => toast({ title: "MoMo failed", description: "Could not initiate payment", variant: "destructive" }),
     },
   });
 
   const { data: momoStatus } = useGetMoMoStatus(momoRef ?? "placeholder", {
-    query: {
-      enabled: !!momoRef,
-      refetchInterval: 2000,
-    } as any,
+    query: { enabled: !!momoRef, refetchInterval: 2000 } as any,
   });
 
+  // --- Computed ---
+  const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const taxAmount = subtotal * TAX_RATE;
+  const total = subtotal + taxAmount;
+  const momoConfirmed = momoStatus?.status === "successful";
+
+  // --- Barcode / search scanner ---
+  const handleSearch = useCallback((val: string) => {
+    setSearch(val);
+  }, []);
+
+  // Auto-add on exact SKU match when inventory data arrives
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      syncOfflineQueue();
+    if (!search || !inventory || inventory.length === 0) return;
+    const skuMatch = inventory.find(i => i.sku?.toLowerCase() === search.toLowerCase());
+    if (skuMatch) {
+      addToCart(skuMatch);
+      setSearch("");
+      setQuickScan(true);
+      setTimeout(() => setQuickScan(false), 600);
+    }
+  }, [inventory]);
+
+  // --- Keyboard shortcut: F12 = checkout ---
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "F12") {
+        e.preventDefault();
+        if (cart.length > 0 && !checkoutOpen) setCheckoutOpen(true);
+      }
+      // ESC closes dialogs
+      if (e.key === "Escape") {
+        if (checkoutOpen) { setCheckoutOpen(false); setMomoRef(null); }
+        if (mobileCartOpen) setMobileCartOpen(false);
+      }
     };
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => { window.removeEventListener("online", handleOnline); window.removeEventListener("offline", handleOffline); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [cart.length, checkoutOpen, mobileCartOpen]);
+
+  // --- Online/offline ---
+  useEffect(() => {
+    const on = () => { setIsOnline(true); syncOfflineQueue(); };
+    const off = () => setIsOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
   }, []);
 
   async function syncOfflineQueue() {
@@ -119,17 +234,14 @@ export default function POSPage() {
     if (queue.length === 0) return;
     try {
       const res = await fetch(`${import.meta.env.BASE_URL}api/transactions/sync`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("pos_token")}`,
-        },
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("pos_token")}` },
         body: JSON.stringify({ transactions: queue }),
       });
       if (res.ok) {
         saveOfflineQueue([]);
         setOfflineCount(0);
         toast({ title: "Offline sales synced", description: `${queue.length} transaction(s) uploaded` });
+        qc.invalidateQueries({ queryKey: ["/api/analytics"] });
       }
     } catch {}
   }
@@ -144,20 +256,10 @@ export default function POSPage() {
     toast({ title: "Saved offline", description: "Will sync when connection is restored" });
   }
 
-  const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  const taxAmount = subtotal * TAX_RATE;
-  const total = subtotal + taxAmount;
-
   function buildTxPayload() {
     return {
       locationId: selectedLocationId!,
-      items: cart.map(i => ({
-        itemId: i.itemId,
-        name: i.name,
-        quantity: i.quantity,
-        price: i.price.toFixed(2),
-        total: (i.price * i.quantity).toFixed(2),
-      })),
+      items: cart.map(i => ({ itemId: i.itemId, name: i.name, quantity: i.quantity, price: i.price.toFixed(2), total: (i.price * i.quantity).toFixed(2) })),
       subtotal: subtotal.toFixed(2),
       taxAmount: taxAmount.toFixed(2),
       total: total.toFixed(2),
@@ -176,7 +278,7 @@ export default function POSPage() {
       if (existing) {
         return prev.map(c => c.itemId === item.id ? { ...c, quantity: c.quantity + 1 } : c);
       }
-      return [...prev, { itemId: item.id, name: item.name, price: parseFloat(item.price), quantity: 1, unit: item.unit ?? "piece" }];
+      return [...prev, { itemId: item.id, name: item.name, price: parseFloat(item.price), quantity: 1, unit: item.unit ?? "piece", sku: item.sku }];
     });
   }
 
@@ -186,6 +288,12 @@ export default function POSPage() {
 
   function removeFromCart(itemId: string) {
     setCart(prev => prev.filter(c => c.itemId !== itemId));
+  }
+
+  function clearCart() {
+    if (cart.length === 0) return;
+    setCart([]);
+    toast({ title: "Cart cleared" });
   }
 
   function handleCheckout() {
@@ -200,33 +308,69 @@ export default function POSPage() {
     initiateMoMo.mutate({ data: { phone: momoPhone, network: momoNetwork, amount: total.toFixed(2), reference: `POS-${Date.now()}` } });
   }
 
-  const momoConfirmed = momoStatus?.status === "successful";
+  // --- Receipt print handler ---
+  function handlePrintReceipt() {
+    if (!completedTx) return;
+    const printContent = document.getElementById("receipt-print");
+    if (!printContent) return;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`
+      <html><head><title>Receipt</title>
+      <style>
+        body { font-family: 'Courier New', monospace; font-size: 12px; width: 300px; margin: 0 auto; padding: 10px; }
+        .center { text-align: center; } .line { border-top: 1px dashed #000; margin: 8px 0; }
+        .row { display: flex; justify-content: space-between; } .bold { font-weight: bold; }
+      </style></head><body>
+      ${printContent.innerHTML}
+      </body></html>
+    `);
+    win.document.close();
+    win.print();
+    win.close();
+  }
+
+  // --- UI Helpers ---
+  const cartItems = cart.length;
+  const cartItemCount = cart.reduce((s, c) => s + c.quantity, 0);
+  const items = inventory ?? [];
+  const filtered = items;
 
   return (
     <div className="flex h-[calc(100vh-56px)] lg:h-screen overflow-hidden">
-      {/* Product grid */}
+      {/* ============ PRODUCT GRID (Left) ============ */}
       <div className="flex-1 flex flex-col min-w-0 border-r border-border overflow-hidden">
-        {/* Search + filter */}
-        <div className="p-4 border-b border-border space-y-3 bg-card">
+        {/* Toolbar: Search + Categories */}
+        <div className="shrink-0 p-3 lg:p-4 border-b border-border space-y-2 bg-card">
+          {/* Search bar — always focused, auto-focus after scan */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
+              ref={searchRef}
               value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search products..."
-              className="pl-9"
+              onChange={e => handleSearch(e.target.value)}
+              placeholder="Scan barcode or search products..."
+              className={cn("pl-10 text-sm transition-shadow", quickScan && "ring-2 ring-primary")}
+              autoFocus
             />
+            {search && (
+              <button onClick={() => { setSearch(""); searchRef.current?.focus(); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+
+          {/* Category pills */}
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
             <button
               onClick={() => setSelectedCategory(null)}
-              className={cn("px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors", !selectedCategory ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80")}
+              className={cn("px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors shrink-0", !selectedCategory ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80")}
             >All</button>
             {categories?.map(cat => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id === selectedCategory ? null : cat.id)}
-                className={cn("px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors", selectedCategory === cat.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80")}
+                className={cn("px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors shrink-0", selectedCategory === cat.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80")}
               >
                 {cat.name}
               </button>
@@ -235,28 +379,37 @@ export default function POSPage() {
         </div>
 
         {/* Status bar */}
-        <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 border-b border-border">
-          {isOnline ? (
-            <span className="flex items-center gap-1 text-xs text-teal-600"><Wifi className="w-3 h-3" /> Online</span>
-          ) : (
-            <span className="flex items-center gap-1 text-xs text-amber-600"><WifiOff className="w-3 h-3" /> Offline mode</span>
-          )}
-          {offlineCount > 0 && (
-            <Badge variant="outline" className="text-xs text-amber-600 border-amber-200">{offlineCount} queued</Badge>
-          )}
+        <div className="shrink-0 flex items-center justify-between gap-2 px-3 lg:px-4 py-1.5 bg-muted/50 border-b border-border">
+          <div className="flex items-center gap-2">
+            {isOnline ? (
+              <span className="flex items-center gap-1 text-xs text-teal-600"><Wifi className="w-3 h-3" /> Online</span>
+            ) : (
+              <span className="flex items-center gap-1 text-xs text-amber-600"><WifiOff className="w-3 h-3" /> Offline</span>
+            )}
+            {offlineCount > 0 && (
+              <Badge variant="outline" className="text-xs text-amber-600 border-amber-200">{offlineCount} queued</Badge>
+            )}
+          </div>
+          <span className="text-xs text-muted-foreground">{filtered.length} items</span>
         </div>
 
-        {/* Grid */}
-        <div className="flex-1 overflow-y-auto p-4">
+        {/* Product Grid */}
+        <div className="flex-1 overflow-y-auto p-3 lg:p-4">
           {!selectedLocationId ? (
             <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
               <ShoppingCart className="w-12 h-12 mb-3 opacity-20" />
               <p className="font-medium">No location selected</p>
               <p className="text-sm">Select a location from the sidebar to start selling</p>
             </div>
+          ) : invLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="h-32 rounded-xl bg-muted animate-pulse" />
+              ))}
+            </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-              {inventory?.map(item => {
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+              {filtered.map(item => {
                 const inCart = cart.find(c => c.itemId === item.id);
                 const outOfStock = item.quantity <= 0;
                 return (
@@ -265,30 +418,33 @@ export default function POSPage() {
                     onClick={() => !outOfStock && addToCart(item)}
                     disabled={outOfStock}
                     className={cn(
-                      "relative p-3 rounded-xl border text-left transition-all hover:shadow-md active:scale-95",
+                      "relative p-3 lg:p-4 rounded-xl border text-left transition-all hover:shadow-md active:scale-95",
                       inCart ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/50",
                       outOfStock && "opacity-50 cursor-not-allowed"
                     )}
                   >
                     {inCart && (
-                      <span className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center text-[10px] font-bold text-primary-foreground">
+                      <span className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center text-[10px] font-bold text-primary-foreground">
                         {inCart.quantity}
                       </span>
                     )}
-                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mb-2">
-                      <ShoppingCart className="w-5 h-5 text-muted-foreground" />
+                    <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-lg bg-muted flex items-center justify-center mb-2">
+                      <Package className="w-6 h-6 text-muted-foreground" />
                     </div>
-                    <p className="font-medium text-xs leading-tight line-clamp-2">{item.name}</p>
-                    <p className="text-primary font-semibold text-sm mt-1">{formatCurrency(item.price)}</p>
+                    <p className="font-medium text-xs lg:text-sm leading-tight line-clamp-2">{item.name}</p>
+                    <p className="text-primary font-semibold text-sm lg:text-base mt-1">{formatCurrency(item.price)}</p>
                     <p className="text-muted-foreground text-[10px] mt-0.5">
-                      {outOfStock ? "Out of stock" : `${item.quantity} ${item.unit ?? "pcs"}`}
+                      {outOfStock ? "Out of stock" : `${item.quantity} ${item.unit ?? "pcs"} left`}
                     </p>
+                    {item.sku && (
+                      <p className="text-muted-foreground text-[9px] mt-0.5 font-mono">{item.sku}</p>
+                    )}
                   </button>
                 );
               })}
-              {inventory?.length === 0 && (
-                <div className="col-span-full text-center py-12 text-muted-foreground">
-                  <Package className="w-10 h-10 mx-auto mb-2 opacity-20" />
+              {filtered.length === 0 && (
+                <div className="col-span-full flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Package className="w-10 h-10 mb-2 opacity-20" />
                   <p>No products found</p>
                 </div>
               )}
@@ -297,132 +453,246 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* Cart */}
-      <div className="w-80 xl:w-96 flex flex-col bg-card overflow-hidden">
-        <div className="p-4 border-b border-border">
-          <h2 className="font-bold text-lg flex items-center gap-2">
+      {/* ============ CART SIDEBAR (Right) — Desktop ============ */}
+      <div className="hidden lg:flex w-96 xl:w-[28rem] flex-col bg-card border-l border-border overflow-hidden">
+        {/* Cart header */}
+        <div className="shrink-0 flex items-center justify-between p-4 border-b border-border">
+          <h2 className="font-bold text-base flex items-center gap-2">
             <ShoppingCart className="w-4 h-4" />
             Cart
-            {cart.length > 0 && <Badge className="ml-auto">{cart.length}</Badge>}
+            {cartItems > 0 && <Badge variant="secondary" className="text-xs">{cartItemCount} items</Badge>}
           </h2>
+          {cartItems > 0 && (
+            <button onClick={clearCart} className="text-xs text-destructive hover:underline">
+              Clear
+            </button>
+          )}
         </div>
 
+        {/* Cart items */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {cart.length === 0 ? (
+          {cartItems === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground py-8">
               <ShoppingCart className="w-10 h-10 mb-2 opacity-20" />
-              <p className="text-sm">Cart is empty</p>
-              <p className="text-xs">Tap a product to add it</p>
+              <p className="text-sm font-medium">Cart is empty</p>
+              <p className="text-xs mt-1">Tap a product to add it</p>
+              <p className="text-[10px] text-muted-foreground mt-3">Press F12 to checkout</p>
             </div>
           ) : cart.map(item => (
-            <div key={item.itemId} className="flex items-center gap-2 bg-background rounded-lg p-2 border border-border">
+            <div key={item.itemId} className="flex items-center gap-3 bg-background rounded-lg p-2.5 border border-border">
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium truncate">{item.name}</p>
-                <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} each</p>
+                <p className="text-[10px] text-muted-foreground">{formatCurrency(item.price)} each</p>
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => updateQty(item.itemId, -1)} className="w-6 h-6 rounded-md bg-muted flex items-center justify-center hover:bg-muted/80">
+                <button onClick={() => updateQty(item.itemId, -1)} className="w-7 h-7 rounded-md bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-95">
                   <Minus className="w-3 h-3" />
                 </button>
-                <span className="w-6 text-center text-xs font-bold">{item.quantity}</span>
-                <button onClick={() => updateQty(item.itemId, 1)} className="w-6 h-6 rounded-md bg-muted flex items-center justify-center hover:bg-muted/80">
+                <span className="w-7 text-center text-xs font-bold tabular-nums">{item.quantity}</span>
+                <button onClick={() => updateQty(item.itemId, 1)} className="w-7 h-7 rounded-md bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-95">
                   <Plus className="w-3 h-3" />
                 </button>
               </div>
               <div className="w-16 text-right">
-                <p className="text-xs font-semibold">{formatCurrency(item.price * item.quantity)}</p>
+                <p className="text-xs font-semibold tabular-nums">{formatCurrency(item.price * item.quantity)}</p>
               </div>
-              <button onClick={() => removeFromCart(item.itemId)} className="text-destructive hover:text-destructive/70 ml-1">
+              <button onClick={() => removeFromCart(item.itemId)} className="text-destructive hover:text-destructive/70 p-1">
                 <Trash2 className="w-3 h-3" />
               </button>
             </div>
           ))}
         </div>
 
-        {/* Totals */}
-        <div className="border-t border-border p-4 space-y-3">
+        {/* Checkout Panel */}
+        <div className="shrink-0 border-t border-border p-4 space-y-3">
+          {/* Totals */}
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between text-muted-foreground">
               <span>Subtotal</span>
-              <span>{formatCurrency(subtotal)}</span>
+              <span className="tabular-nums">{formatCurrency(subtotal)}</span>
             </div>
             <div className="flex justify-between text-muted-foreground">
               <span>VAT (15%)</span>
-              <span>{formatCurrency(taxAmount)}</span>
+              <span className="tabular-nums">{formatCurrency(taxAmount)}</span>
             </div>
             <Separator />
             <div className="flex justify-between font-bold text-base">
               <span>Total</span>
-              <span className="text-primary">{formatCurrency(total)}</span>
+              <span className="text-primary tabular-nums">{formatCurrency(total)}</span>
             </div>
           </div>
 
           {/* Payment method */}
-          <div className="grid grid-cols-3 gap-1.5">
-            {(["cash", "momo", "card"] as const).map(pm => (
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              { key: "cash", icon: Banknote, label: "Cash" },
+              { key: "momo", icon: Smartphone, label: "MoMo" },
+              { key: "card", icon: CreditCard, label: "Card" },
+            ] as const).map(({ key, icon: Icon, label }) => (
               <button
-                key={pm}
-                onClick={() => setPaymentMethod(pm)}
+                key={key}
+                onClick={() => setPaymentMethod(key)}
                 className={cn(
-                  "flex flex-col items-center gap-1 py-2 rounded-lg border text-xs font-medium transition-colors",
-                  paymentMethod === pm ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
+                  "flex flex-col items-center gap-1 py-2.5 rounded-lg border text-xs font-medium transition-colors min-h-[48px]",
+                  paymentMethod === key ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
                 )}
               >
-                {pm === "cash" && <Banknote className="w-4 h-4" />}
-                {pm === "momo" && <Smartphone className="w-4 h-4" />}
-                {pm === "card" && <CreditCard className="w-4 h-4" />}
-                {pm === "cash" ? "Cash" : pm === "momo" ? "MoMo" : "Card"}
+                <Icon className="w-4 h-4" />
+                {label}
               </button>
             ))}
           </div>
 
+          {/* Pay / F12 */}
           <Button
-            className="w-full"
-            disabled={cart.length === 0 || createTx.isPending}
+            className="w-full h-12 text-base font-bold gap-2"
+            disabled={cartItems === 0 || createTx.isPending}
             onClick={() => setCheckoutOpen(true)}
           >
-            {createTx.isPending ? "Processing..." : `Checkout — ${formatCurrency(total)}`}
+            {createTx.isPending ? "Processing..." : (
+              <>
+                <span>Pay</span>
+                <span className="text-xs font-normal opacity-80">F12</span>
+                <span className="tabular-nums">{formatCurrency(total)}</span>
+              </>
+            )}
           </Button>
         </div>
       </div>
 
-      {/* Checkout dialog */}
-      <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
-        <DialogContent className="max-w-md">
+      {/* ============ MOBILE CART BUTTON (bottom sticky) ============ */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-card border-t border-border p-3 flex items-center gap-3">
+        <button
+          onClick={() => setMobileCartOpen(true)}
+          className="flex-1 flex items-center justify-center gap-2 h-12 rounded-lg bg-primary text-primary-foreground font-bold text-sm"
+        >
+          <ShoppingCart className="w-4 h-4" />
+          <span className="tabular-nums">{formatCurrency(total)}</span>
+          <Badge className="bg-primary-foreground text-primary text-xs ml-1">{cartItemCount}</Badge>
+        </button>
+      </div>
+
+      {/* ============ MOBILE CART DRAWER ============ */}
+      <div className={cn(
+        "lg:hidden fixed inset-0 z-40 transition-opacity",
+        mobileCartOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+      )}>
+        <div className="absolute inset-0 bg-black/50" onClick={() => setMobileCartOpen(false)} />
+        <div className={cn(
+          "absolute bottom-0 left-0 right-0 bg-card rounded-t-2xl shadow-xl transition-transform duration-300 flex flex-col max-h-[85vh]",
+          mobileCartOpen ? "translate-y-0" : "translate-y-full"
+        )}>
+          {/* Drag handle */}
+          <div className="flex items-center justify-center pt-3 pb-1">
+            <div className="w-10 h-1 rounded-full bg-muted" />
+          </div>
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+            <h3 className="font-bold text-sm flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4" /> Cart ({cartItemCount})
+            </h3>
+            <div className="flex items-center gap-2">
+              {cartItems > 0 && (
+                <button onClick={clearCart} className="text-xs text-destructive hover:underline">Clear</button>
+              )}
+              <button onClick={() => setMobileCartOpen(false)} className="p-1">
+                <ChevronUp className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+          </div>
+          {/* Items */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {cartItems === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                <ShoppingCart className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                <p className="text-sm">Cart is empty</p>
+              </div>
+            ) : cart.map(item => (
+              <div key={item.itemId} className="flex items-center gap-2 bg-background rounded-lg p-2 border border-border">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate">{item.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{formatCurrency(item.price)} each</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => updateQty(item.itemId, -1)} className="w-8 h-8 rounded-md bg-muted flex items-center justify-center min-w-[32px] min-h-[32px]"><Minus className="w-3 h-3" /></button>
+                  <span className="w-6 text-center text-xs font-bold tabular-nums">{item.quantity}</span>
+                  <button onClick={() => updateQty(item.itemId, 1)} className="w-8 h-8 rounded-md bg-muted flex items-center justify-center min-w-[32px] min-h-[32px]"><Plus className="w-3 h-3" /></button>
+                </div>
+                <div className="w-14 text-right">
+                  <p className="text-xs font-semibold tabular-nums">{formatCurrency(item.price * item.quantity)}</p>
+                </div>
+                <button onClick={() => removeFromCart(item.itemId)} className="text-destructive p-1 min-w-[32px] min-h-[32px] flex items-center justify-center">
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+          {/* Totals + Payment */}
+          <div className="shrink-0 border-t border-border p-3 space-y-3">
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span className="tabular-nums">{formatCurrency(subtotal)}</span></div>
+              <div className="flex justify-between text-muted-foreground"><span>VAT (15%)</span><span className="tabular-nums">{formatCurrency(taxAmount)}</span></div>
+              <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-primary tabular-nums">{formatCurrency(total)}</span></div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { key: "cash", icon: Banknote, label: "Cash" },
+                { key: "momo", icon: Smartphone, label: "MoMo" },
+                { key: "card", icon: CreditCard, label: "Card" },
+              ] as const).map(({ key, icon: Icon, label }) => (
+                <button key={key} onClick={() => setPaymentMethod(key)} className={cn("flex flex-col items-center gap-1 py-2 rounded-lg border text-xs font-medium min-h-[48px]", paymentMethod === key ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground")}>
+                  <Icon className="w-4 h-4" />{label}
+                </button>
+              ))}
+            </div>
+            <Button className="w-full h-12 text-base font-bold gap-2" disabled={cartItems === 0 || createTx.isPending} onClick={() => { setMobileCartOpen(false); setCheckoutOpen(true); }}>
+              {createTx.isPending ? "Processing..." : <><span>Pay</span><span className="tabular-nums">{formatCurrency(total)}</span></>}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* ============ CHECKOUT DIALOG ============ */}
+      <Dialog open={checkoutOpen} onOpenChange={(v) => { if (!v) { setCheckoutOpen(false); setMomoRef(null); } }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Complete Sale</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4" /> Complete Sale
+            </DialogTitle>
           </DialogHeader>
+
           <div className="space-y-4 py-2">
+            {/* Bill Summary */}
             <div className="bg-muted rounded-lg p-3 space-y-1 text-sm">
-              <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
-              <div className="flex justify-between"><span>VAT (15%)</span><span>{formatCurrency(taxAmount)}</span></div>
+              <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span className="tabular-nums">{formatCurrency(subtotal)}</span></div>
+              <div className="flex justify-between text-muted-foreground"><span>VAT (15%)</span><span className="tabular-nums">{formatCurrency(taxAmount)}</span></div>
               <Separator className="my-1" />
-              <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-primary">{formatCurrency(total)}</span></div>
+              <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-primary tabular-nums">{formatCurrency(total)}</span></div>
+              <div className="text-xs text-muted-foreground mt-1">{cartItemCount} items · {paymentMethod.toUpperCase()}</div>
             </div>
 
+            {/* Customer */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Customer Name (optional)</Label>
+                <Label className="text-xs">Customer Name</Label>
                 <Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Name" className="h-8 text-sm" />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Customer Phone (optional)</Label>
+                <Label className="text-xs">Customer Phone</Label>
                 <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="+233..." className="h-8 text-sm" />
               </div>
             </div>
 
+            {/* MoMo Panel */}
             {paymentMethod === "momo" && (
               <div className="space-y-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                <p className="text-sm font-medium text-yellow-800">MoMo Payment</p>
+                <p className="text-sm font-medium text-yellow-800">Mobile Money Payment</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <Label className="text-xs">Network</Label>
                     <Select value={momoNetwork} onValueChange={v => setMomoNetwork(v as any)}>
                       <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="MTN">MTN</SelectItem>
-                        <SelectItem value="Telecel">Telecel</SelectItem>
-                      </SelectContent>
+                      <SelectContent><SelectItem value="MTN">MTN</SelectItem><SelectItem value="Telecel">Telecel</SelectItem></SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1">
@@ -432,12 +702,11 @@ export default function POSPage() {
                 </div>
                 {!momoRef ? (
                   <Button size="sm" variant="outline" className="w-full border-yellow-400 text-yellow-700" onClick={handleMoMoInitiate} disabled={initiateMoMo.isPending}>
-                    {initiateMoMo.isPending ? "Sending..." : "Send Payment Request"}
+                    <Send className="w-3 h-3 mr-1" /> {initiateMoMo.isPending ? "Sending..." : "Send Payment Request"}
                   </Button>
                 ) : momoConfirmed ? (
                   <div className="flex items-center gap-2 text-teal-700 text-sm">
-                    <CheckCircle2 className="w-4 h-4" />
-                    Payment confirmed!
+                    <CheckCircle2 className="w-4 h-4" /> Payment confirmed!
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 text-yellow-700 text-sm">
@@ -447,20 +716,30 @@ export default function POSPage() {
                 )}
               </div>
             )}
+
+            {/* Cash / Card info */}
+            {paymentMethod === "cash" && (
+              <div className="p-3 bg-teal-50 rounded-lg border border-teal-200 text-sm text-teal-700">
+                <div className="flex items-center gap-2"><Banknote className="w-4 h-4" /> Collect <strong className="tabular-nums">{formatCurrency(total)}</strong> in cash</div>
+              </div>
+            )}
+            {paymentMethod === "card" && (
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-700">
+                <div className="flex items-center gap-2"><CreditCard className="w-4 h-4" /> Process card payment for <strong className="tabular-nums">{formatCurrency(total)}</strong></div>
+              </div>
+            )}
           </div>
+
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => { setCheckoutOpen(false); setMomoRef(null); }}>Cancel</Button>
-            <Button
-              onClick={handleCheckout}
-              disabled={createTx.isPending || (paymentMethod === "momo" && !momoConfirmed)}
-            >
+            <Button onClick={handleCheckout} disabled={createTx.isPending || (paymentMethod === "momo" && !momoConfirmed)}>
               {createTx.isPending ? "Processing..." : "Complete Sale"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Receipt */}
+      {/* ============ RECEIPT MODAL ============ */}
       {completedTx && (
         <ReceiptModal
           open={receiptOpen}
@@ -470,8 +749,4 @@ export default function POSPage() {
       )}
     </div>
   );
-}
-
-function Package({ className }: { className?: string }) {
-  return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>;
 }

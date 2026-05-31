@@ -1,0 +1,28 @@
+Act as a Principal Full-Stack Engineer and UX Designer specializing in retail Point of Sale (POS) storefront applications. 
+
+I need to build a standard, high-speed Ghanaian POS storefront checkout webpage. The interface must be optimized for fast-paced retail environments (like supermarkets/pharmacies in Ghana) where speed, barcode scanner accuracy, local tax compliance, and Mobile Money integrations are critical.
+
+Please generate the complete UI structure, state management logic, and API integration scaffolding based on these explicit specifications:
+
+1. STOREFRONT UI LAYOUT (Responsive Split-Screen):
+- Left/Center Section (Product Grid): A scrollable, responsive grid of touch-friendly item cards with product names, images, and prices. Include a prominent, auto-focused global search bar at the very top that handles both typed text queries and raw input from a physical USB hardware barcode scanner.
+- Right Section (Active Cart): A sticky vertical sidebar layout showing items currently added to the bill. Each line item must clearly display the item name, an editable quantity counter, individual unit price, total price, and a delete icon.
+- Bottom Section (Checkout Panel): Displays the running Subtotal, separate line items for GRA taxes, and a massive "Pay / F12" button that triggers the payment modal.
+
+
+4. HARDWARE TRIGGERS (Receipt Printing Blueprint):
+- Write an exportable function that structures the finalized transaction data into a clean, raw semantic format optimized for 80mm thermal receipt printers. 
+- Ensure the receipt layout cleanly prints the Store Name, Cashier Identity, itemized list, individual GRA tax breakdowns, Total Paid, and a placeholder area for a GRA digital signature / QR code.
+
+5.Tech Stack & Responsiveness Preferences:
+- Frontend Language/Framework: React with Tailwind CSS
+- Layout Architecture: Mobile-first hybrid approach. 
+  * On large desktop screens/monitors (min-width: 1024px), display a persistent, non-scrollable split-screen layout (Left side: Product Grid; Right side: Fixed Checkout Sidebar).
+  * On mobile devices and tablets (max-width: 1023px), collapse the interface into a single-column scrolling view with a sticky bottom navigation bar or sliding drawer for the active cart.
+- Design System: Tailwind CSS with touch-friendly interaction targets (minimum button sizes of 48px x 48px for mobile vendor thumbs).
+
+Tech Stack Preferences:
+- Frontend Language/Framework: [React + Vite]
+- State Management: [suggest best for app]
+
+Please provide production-ready code with comprehensive layout markup, CSS styling rules, and clean state logic. Explain how to manage the scanner focus so that scanning a barcode never interrupts the user's workflow.

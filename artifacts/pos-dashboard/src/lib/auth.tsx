@@ -21,15 +21,31 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function getDevAuth(): { token: string | null; user: AuthUser | null } {
+  if (typeof window === "undefined") return { token: null, user: null };
+  const hash = window.location.hash;
+  const tokenMatch = hash.match(/tkn=([^&]+)/);
+  const userMatch = hash.match(/usr=([^&]+)/);
+  let token = null;
+  let user = null;
+  if (tokenMatch) { token = decodeURIComponent(tokenMatch[1]); localStorage.setItem("pos_token", token); }
+  if (userMatch) {
+    try { user = JSON.parse(decodeURIComponent(userMatch[1])); localStorage.setItem("pos_user", JSON.stringify(user)); } catch {}
+  }
+  return { token, user };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem("pos_token"));
-  const [user, setUser] = useState<AuthUser | null>(() => {
+  const dev = typeof window !== "undefined" ? getDevAuth() : { token: null, user: null };
+  const [token, setToken] = useState<string | null>(() => dev.token ?? localStorage.getItem("pos_token"));
+  const [user, setUser] = useState<AuthUser | null>(() => dev.user ?? (() => {
     const raw = localStorage.getItem("pos_user");
     return raw ? JSON.parse(raw) : null;
+  })());
+  const [selectedLocationId, setSelectedLocationIdState] = useState<string | null>(() => {
+    if (dev.user?.locationId) { localStorage.setItem("pos_location_id", dev.user.locationId); return dev.user.locationId; }
+    return localStorage.getItem("pos_location_id");
   });
-  const [selectedLocationId, setSelectedLocationIdState] = useState<string | null>(() =>
-    localStorage.getItem("pos_location_id")
-  );
 
   useEffect(() => {
     setAuthTokenGetter(() => localStorage.getItem("pos_token"));

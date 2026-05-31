@@ -17,7 +17,12 @@ router.get("/", authenticateToken, async (req, res) => {
   const conditions = [eq(inventoryTable.isActive, true)];
   if (effectiveLocationId) conditions.push(eq(inventoryTable.locationId, effectiveLocationId));
   if (categoryId) conditions.push(eq(inventoryTable.categoryId, categoryId));
-  if (search) conditions.push(ilike(inventoryTable.name, `%${search}%`));
+  if (search) {
+    // Search by name OR SKU (barcode scan support)
+    conditions.push(
+      sql`${inventoryTable.name} ILIKE ${`%${search}%`} OR ${inventoryTable.sku} ILIKE ${`%${search}%`}`
+    );
+  }
   if (lowStock === "true") conditions.push(lte(inventoryTable.quantity, inventoryTable.minQuantity));
 
   const items = await db

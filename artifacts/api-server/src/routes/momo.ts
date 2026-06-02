@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { nanoid } from "nanoid";
+import { db, transactionsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { authenticateToken } from "../middleware/auth";
 
 const router = Router();
@@ -50,6 +52,43 @@ router.get("/status/:reference", authenticateToken, async (req, res) => {
     phone: payment.phone,
     message: payment.status === "successful" ? "Payment confirmed" : "Awaiting confirmation",
   });
+});
+
+router.post("/webhook", async (req, res) => {
+  const { reference, status, amount, phone } = req.body as {
+    reference?: string; status?: string; amount?: string; phone?: string;
+  };
+
+  if (!reference || !status) {
+    res.status(400).json({ error: "reference and status required" });
+    return;
+  }
+
+  // Update stored payment status
+  const payment = momoPayments.get(reference);
+  if (payment) {
+    payment.status = status;
+  }
+
+  // Update transaction if linked via momoReference
+  if (status === "successful" || status === "failed") {
+    const txs = await db
+      .select()
+      .from(transactionsTable)
+      .where(eq(transactionsTable.momoReference, reference))
+      .limit(1);
+    if (txs.length > 0) {
+      await db
+        .update(transactionsTable)
+        .set({
+          paymentStatus: status === "successful" ? "completed" : "failed",
+        })
+        .where(eq(transactionsTable.id, txs[0].id));
+    }
+  }
+
+  req.log.info({ reference, status, phone }, "MoMo webhook received");
+  res.json({ received: true, reference, status });
 });
 
 export default router;

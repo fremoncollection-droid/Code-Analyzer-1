@@ -32,7 +32,8 @@ export const LoginResponse = zod.object({
   "username": zod.string(),
   "email": zod.string(),
   "role": zod.string(),
-  "locationId": zod.string().nullish()
+  "locationId": zod.string().nullish(),
+  "station": zod.string().nullish()
 })
 })
 
@@ -52,7 +53,8 @@ export const RefreshTokenResponse = zod.object({
   "username": zod.string(),
   "email": zod.string(),
   "role": zod.string(),
-  "locationId": zod.string().nullish()
+  "locationId": zod.string().nullish(),
+  "station": zod.string().nullish()
 })
 })
 
@@ -65,7 +67,56 @@ export const GetMeResponse = zod.object({
   "username": zod.string(),
   "email": zod.string(),
   "role": zod.string(),
-  "locationId": zod.string().nullish()
+  "locationId": zod.string().nullish(),
+  "station": zod.string().nullish()
+})
+
+
+/**
+ * @summary Login with PIN (cashier fast login)
+ */
+export const pinLoginBodyPinMin = 4;
+export const pinLoginBodyPinMax = 6;
+
+
+
+export const PinLoginBody = zod.object({
+  "username": zod.string(),
+  "pin": zod.string().min(pinLoginBodyPinMin).max(pinLoginBodyPinMax)
+})
+
+export const PinLoginResponse = zod.object({
+  "token": zod.string(),
+  "refreshToken": zod.string(),
+  "user": zod.object({
+  "id": zod.string(),
+  "username": zod.string(),
+  "email": zod.string(),
+  "role": zod.string(),
+  "locationId": zod.string().nullish(),
+  "station": zod.string().nullish()
+})
+})
+
+
+/**
+ * @summary Validate manager PIN for override
+ */
+export const managerOverrideBodyPinMin = 4;
+export const managerOverrideBodyPinMax = 6;
+
+
+
+export const ManagerOverrideBody = zod.object({
+  "username": zod.string(),
+  "pin": zod.string().min(managerOverrideBodyPinMin).max(managerOverrideBodyPinMax)
+})
+
+export const ManagerOverrideResponse = zod.object({
+  "overrideToken": zod.string(),
+  "managerId": zod.string(),
+  "managerName": zod.string(),
+  "expiresIn": zod.string()
 })
 
 
@@ -300,6 +351,7 @@ export const ListTransactionsResponse = zod.object({
  */
 export const CreateTransactionBody = zod.object({
   "locationId": zod.string(),
+  "shiftId": zod.string().optional(),
   "items": zod.array(zod.object({
   "itemId": zod.string(),
   "name": zod.string(),
@@ -309,6 +361,9 @@ export const CreateTransactionBody = zod.object({
 })),
   "subtotal": zod.string(),
   "taxAmount": zod.string(),
+  "taxBreakdown": zod.object({
+
+}).passthrough().optional(),
   "total": zod.string(),
   "paymentMethod": zod.enum(['cash', 'momo', 'card']),
   "momoPhone": zod.string().optional(),
@@ -456,6 +511,7 @@ export const GetReceiptResponse = zod.object({
 export const SyncOfflineTransactionsBody = zod.object({
   "transactions": zod.array(zod.object({
   "locationId": zod.string(),
+  "shiftId": zod.string().optional(),
   "items": zod.array(zod.object({
   "itemId": zod.string(),
   "name": zod.string(),
@@ -465,6 +521,9 @@ export const SyncOfflineTransactionsBody = zod.object({
 })),
   "subtotal": zod.string(),
   "taxAmount": zod.string(),
+  "taxBreakdown": zod.object({
+
+}).passthrough().optional(),
   "total": zod.string(),
   "paymentMethod": zod.enum(['cash', 'momo', 'card']),
   "momoPhone": zod.string().optional(),
@@ -503,8 +562,17 @@ export const ListShiftsResponseItem = zod.object({
   "startTime": zod.string(),
   "endTime": zod.string().nullish(),
   "status": zod.string(),
-  "openingCash": zod.string().nullish(),
-  "closingCash": zod.string().nullish(),
+  "openingFloat": zod.string().nullish(),
+  "closingFloat": zod.string().nullish(),
+  "expectedCash": zod.string().nullish(),
+  "expectedMoMo": zod.string().nullish(),
+  "expectedCard": zod.string().nullish(),
+  "actualCash": zod.string().nullish(),
+  "actualMoMo": zod.string().nullish(),
+  "actualCard": zod.string().nullish(),
+  "varianceCash": zod.string().nullish(),
+  "varianceMoMo": zod.string().nullish(),
+  "varianceCard": zod.string().nullish(),
   "notes": zod.string().nullish(),
   "createdAt": zod.string().optional()
 })
@@ -540,8 +608,17 @@ export const GetShiftResponse = zod.object({
   "startTime": zod.string(),
   "endTime": zod.string().nullish(),
   "status": zod.string(),
-  "openingCash": zod.string().nullish(),
-  "closingCash": zod.string().nullish(),
+  "openingFloat": zod.string().nullish(),
+  "closingFloat": zod.string().nullish(),
+  "expectedCash": zod.string().nullish(),
+  "expectedMoMo": zod.string().nullish(),
+  "expectedCard": zod.string().nullish(),
+  "actualCash": zod.string().nullish(),
+  "actualMoMo": zod.string().nullish(),
+  "actualCard": zod.string().nullish(),
+  "varianceCash": zod.string().nullish(),
+  "varianceMoMo": zod.string().nullish(),
+  "varianceCard": zod.string().nullish(),
   "notes": zod.string().nullish(),
   "createdAt": zod.string().optional()
 })
@@ -571,8 +648,17 @@ export const UpdateShiftResponse = zod.object({
   "startTime": zod.string(),
   "endTime": zod.string().nullish(),
   "status": zod.string(),
-  "openingCash": zod.string().nullish(),
-  "closingCash": zod.string().nullish(),
+  "openingFloat": zod.string().nullish(),
+  "closingFloat": zod.string().nullish(),
+  "expectedCash": zod.string().nullish(),
+  "expectedMoMo": zod.string().nullish(),
+  "expectedCard": zod.string().nullish(),
+  "actualCash": zod.string().nullish(),
+  "actualMoMo": zod.string().nullish(),
+  "actualCard": zod.string().nullish(),
+  "varianceCash": zod.string().nullish(),
+  "varianceMoMo": zod.string().nullish(),
+  "varianceCard": zod.string().nullish(),
   "notes": zod.string().nullish(),
   "createdAt": zod.string().optional()
 })
@@ -583,6 +669,101 @@ export const UpdateShiftResponse = zod.object({
  */
 export const DeleteShiftParams = zod.object({
   "id": zod.coerce.string()
+})
+
+
+/**
+ * @summary Open a new shift (clock in)
+ */
+export const OpenShiftBody = zod.object({
+  "userId": zod.string(),
+  "locationId": zod.string(),
+  "openingFloat": zod.string().optional()
+})
+
+
+/**
+ * @summary Close shift with blind reconciliation
+ */
+export const CloseShiftBody = zod.object({
+  "shiftId": zod.string(),
+  "actualCash": zod.string().optional(),
+  "actualMoMo": zod.string().optional(),
+  "actualCard": zod.string().optional(),
+  "closingFloat": zod.string().optional()
+})
+
+export const CloseShiftResponse = zod.object({
+  "shift": zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "userName": zod.string().nullish(),
+  "locationId": zod.string(),
+  "locationName": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string().nullish(),
+  "status": zod.string(),
+  "openingFloat": zod.string().nullish(),
+  "closingFloat": zod.string().nullish(),
+  "expectedCash": zod.string().nullish(),
+  "expectedMoMo": zod.string().nullish(),
+  "expectedCard": zod.string().nullish(),
+  "actualCash": zod.string().nullish(),
+  "actualMoMo": zod.string().nullish(),
+  "actualCard": zod.string().nullish(),
+  "varianceCash": zod.string().nullish(),
+  "varianceMoMo": zod.string().nullish(),
+  "varianceCard": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string().optional()
+}),
+  "expected": zod.object({
+  "cash": zod.string().optional(),
+  "momo": zod.string().optional(),
+  "card": zod.string().optional()
+}),
+  "actual": zod.object({
+  "cash": zod.number().optional(),
+  "momo": zod.number().optional(),
+  "card": zod.number().optional()
+}),
+  "variance": zod.object({
+  "cash": zod.number().optional(),
+  "momo": zod.number().optional(),
+  "card": zod.number().optional()
+})
+})
+
+
+/**
+ * @summary Get active shift for a user
+ */
+export const GetActiveShiftParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const GetActiveShiftResponse = zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "userName": zod.string().nullish(),
+  "locationId": zod.string(),
+  "locationName": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string().nullish(),
+  "status": zod.string(),
+  "openingFloat": zod.string().nullish(),
+  "closingFloat": zod.string().nullish(),
+  "expectedCash": zod.string().nullish(),
+  "expectedMoMo": zod.string().nullish(),
+  "expectedCard": zod.string().nullish(),
+  "actualCash": zod.string().nullish(),
+  "actualMoMo": zod.string().nullish(),
+  "actualCard": zod.string().nullish(),
+  "varianceCash": zod.string().nullish(),
+  "varianceMoMo": zod.string().nullish(),
+  "varianceCard": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string().optional()
 })
 
 
@@ -756,5 +937,140 @@ export const GetSettingsResponse = zod.record(zod.string(), zod.string())
 export const UpdateSettingsBody = zod.record(zod.string(), zod.string())
 
 export const UpdateSettingsResponse = zod.record(zod.string(), zod.string())
+
+
+/**
+ * @summary List users (admin/manager only)
+ */
+export const ListUsersQueryParams = zod.object({
+  "role": zod.coerce.string().optional(),
+  "locationId": zod.coerce.string().optional()
+})
+
+export const ListUsersResponseItem = zod.object({
+  "id": zod.string(),
+  "username": zod.string(),
+  "email": zod.string(),
+  "role": zod.string(),
+  "locationId": zod.string().nullish(),
+  "station": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional()
+})
+export const ListUsersResponse = zod.array(ListUsersResponseItem)
+
+
+/**
+ * @summary Create a new user
+ */
+export const CreateUserBody = zod.object({
+  "username": zod.string(),
+  "email": zod.string(),
+  "password": zod.string(),
+  "pin": zod.string().optional(),
+  "role": zod.string(),
+  "locationId": zod.string().optional(),
+  "station": zod.string().optional()
+})
+
+
+/**
+ * @summary Update user
+ */
+export const UpdateUserParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateUserBody = zod.object({
+  "email": zod.string().optional(),
+  "role": zod.string().optional(),
+  "locationId": zod.string().optional(),
+  "station": zod.string().optional(),
+  "isActive": zod.boolean().optional(),
+  "password": zod.string().optional(),
+  "pin": zod.string().optional()
+})
+
+export const UpdateUserResponse = zod.object({
+  "id": zod.string(),
+  "username": zod.string(),
+  "email": zod.string(),
+  "role": zod.string(),
+  "locationId": zod.string().nullish(),
+  "station": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Delete user (admin only)
+ */
+export const DeleteUserParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+/**
+ * @summary List audit logs
+ */
+export const ListAuditLogsQueryParams = zod.object({
+  "action": zod.coerce.string().optional(),
+  "userId": zod.coerce.string().optional(),
+  "limit": zod.coerce.number().optional(),
+  "offset": zod.coerce.number().optional()
+})
+
+export const ListAuditLogsResponseItem = zod.object({
+  "id": zod.string(),
+  "userId": zod.string().nullish(),
+  "userName": zod.string().nullish(),
+  "approvedBy": zod.string().nullish(),
+  "approverName": zod.string().nullish(),
+  "action": zod.string(),
+  "tableName": zod.string().nullish(),
+  "recordId": zod.string().nullish(),
+  "oldValues": zod.object({
+
+}).passthrough().optional(),
+  "newValues": zod.object({
+
+}).passthrough().optional(),
+  "ipAddress": zod.string().nullish(),
+  "userAgent": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListAuditLogsResponse = zod.array(ListAuditLogsResponseItem)
+
+
+/**
+ * @summary Create audit log entry
+ */
+export const CreateAuditLogBody = zod.object({
+  "userId": zod.string().optional(),
+  "action": zod.string(),
+  "tableName": zod.string().optional(),
+  "recordId": zod.string().optional(),
+  "oldValues": zod.object({
+
+}).passthrough().optional(),
+  "newValues": zod.object({
+
+}).passthrough().optional(),
+  "approvedBy": zod.string().optional()
+})
+
+
+/**
+ * @summary MoMo webhook callback
+ */
+export const MomoWebhookBody = zod.object({
+  "reference": zod.string().optional(),
+  "status": zod.string().optional(),
+  "amount": zod.string().optional(),
+  "phone": zod.string().optional()
+})
 
 

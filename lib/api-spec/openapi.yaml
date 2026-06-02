@@ -100,6 +100,52 @@ paths:
               schema:
                 $ref: "#/components/schemas/UserProfile"
 
+  /auth/pin-login:
+    post:
+      operationId: pinLogin
+      tags: [auth]
+      summary: Login with PIN (cashier fast login)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PinLoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+        "429":
+          description: Rate limited
+
+  /auth/manager-override:
+    post:
+      operationId: managerOverride
+      tags: [auth]
+      summary: Validate manager PIN for override
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PinLoginInput"
+      responses:
+        "200":
+          description: Override granted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OverrideResponse"
+        "401":
+          description: Invalid credentials
+        "403":
+          description: Not authorized
+
   /locations:
     get:
       operationId: listLocations
@@ -574,6 +620,71 @@ paths:
         "204":
           description: Deleted
 
+  /shifts/open:
+    post:
+      operationId: openShift
+      tags: [shifts]
+      summary: Open a new shift (clock in)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenShiftInput"
+      responses:
+        "201":
+          description: Shift opened
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shift"
+        "409":
+          description: Already has active shift
+
+  /shifts/close:
+    post:
+      operationId: closeShift
+      tags: [shifts]
+      summary: Close shift with blind reconciliation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloseShiftInput"
+      responses:
+        "200":
+          description: Shift closed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShiftCloseResult"
+
+  /shifts/active/{userId}:
+    get:
+      operationId: getActiveShift
+      tags: [shifts]
+      summary: Get active shift for a user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Active shift or null
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shift"
+
   /transfers:
     get:
       operationId: listTransfers
@@ -808,6 +919,170 @@ paths:
         "403":
           description: Forbidden
 
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users (admin/manager only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+        - name: locationId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete user (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /audit:
+    get:
+      operationId: listAuditLogs
+      tags: [audit]
+      summary: List audit logs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditLog"
+    post:
+      operationId: createAuditLog
+      tags: [audit]
+      summary: Create audit log entry
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuditLogInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLog"
+
+  /momo/webhook:
+    post:
+      operationId: momoWebhook
+      tags: [momo]
+      summary: MoMo webhook callback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reference:
+                  type: string
+                status:
+                  type: string
+                amount:
+                  type: string
+                phone:
+                  type: string
+      responses:
+        "200":
+          description: Webhook processed
+
 components:
   securitySchemes:
     bearerAuth:
@@ -864,6 +1139,8 @@ components:
         role:
           type: string
         locationId:
+          type: ["string", "null"]
+        station:
           type: ["string", "null"]
 
     Location:
@@ -1021,6 +1298,8 @@ components:
       properties:
         locationId:
           type: string
+        shiftId:
+          type: string
         items:
           type: array
           items:
@@ -1029,6 +1308,8 @@ components:
           type: string
         taxAmount:
           type: string
+        taxBreakdown:
+          type: object
         total:
           type: string
         paymentMethod:
@@ -1200,13 +1481,115 @@ components:
           type: ["string", "null"]
         status:
           type: string
-        openingCash:
+        openingFloat:
           type: ["string", "null"]
-        closingCash:
+        closingFloat:
+          type: ["string", "null"]
+        expectedCash:
+          type: ["string", "null"]
+        expectedMoMo:
+          type: ["string", "null"]
+        expectedCard:
+          type: ["string", "null"]
+        actualCash:
+          type: ["string", "null"]
+        actualMoMo:
+          type: ["string", "null"]
+        actualCard:
+          type: ["string", "null"]
+        varianceCash:
+          type: ["string", "null"]
+        varianceMoMo:
+          type: ["string", "null"]
+        varianceCard:
           type: ["string", "null"]
         notes:
           type: ["string", "null"]
         createdAt:
+          type: string
+
+    OpenShiftInput:
+      type: object
+      required: [userId, locationId]
+      properties:
+        userId:
+          type: string
+        locationId:
+          type: string
+        openingFloat:
+          type: string
+
+    CloseShiftInput:
+      type: object
+      required: [shiftId]
+      properties:
+        shiftId:
+          type: string
+        actualCash:
+          type: string
+        actualMoMo:
+          type: string
+        actualCard:
+          type: string
+        closingFloat:
+          type: string
+
+    ShiftCloseResult:
+      type: object
+      required: [shift, expected, actual, variance]
+      properties:
+        shift:
+          $ref: "#/components/schemas/Shift"
+        expected:
+          type: object
+          properties:
+            cash:
+              type: string
+            momo:
+              type: string
+            card:
+              type: string
+        actual:
+          type: object
+          properties:
+            cash:
+              type: number
+            momo:
+              type: number
+            card:
+              type: number
+        variance:
+          type: object
+          properties:
+            cash:
+              type: number
+            momo:
+              type: number
+            card:
+              type: number
+
+    PinLoginInput:
+      type: object
+      required: [username, pin]
+      properties:
+        username:
+          type: string
+        pin:
+          type: string
+          minLength: 4
+          maxLength: 6
+
+    OverrideResponse:
+      type: object
+      required: [overrideToken, managerId, managerName, expiresIn]
+      properties:
+        overrideToken:
+          type: string
+        managerId:
+          type: string
+        managerName:
+          type: string
+        expiresIn:
           type: string
 
     TransferInput:
@@ -1348,3 +1731,113 @@ components:
       type: object
       additionalProperties:
         type: string
+
+    User:
+      type: object
+      required: [id, username, email, role, isActive]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        locationId:
+          type: ["string", "null"]
+        station:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    UserInput:
+      type: object
+      required: [username, email, password, role]
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        pin:
+          type: string
+        role:
+          type: string
+        locationId:
+          type: string
+        station:
+          type: string
+
+    UserUpdate:
+      type: object
+      properties:
+        email:
+          type: string
+        role:
+          type: string
+        locationId:
+          type: string
+        station:
+          type: string
+        isActive:
+          type: boolean
+        password:
+          type: string
+        pin:
+          type: string
+
+    AuditLog:
+      type: object
+      required: [id, action, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: ["string", "null"]
+        userName:
+          type: ["string", "null"]
+        approvedBy:
+          type: ["string", "null"]
+        approverName:
+          type: ["string", "null"]
+        action:
+          type: string
+        tableName:
+          type: ["string", "null"]
+        recordId:
+          type: ["string", "null"]
+        oldValues:
+          type: object
+        newValues:
+          type: object
+        ipAddress:
+          type: ["string", "null"]
+        userAgent:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    AuditLogInput:
+      type: object
+      required: [action]
+      properties:
+        userId:
+          type: string
+        action:
+          type: string
+        tableName:
+          type: string
+        recordId:
+          type: string
+        oldValues:
+          type: object
+        newValues:
+          type: object
+        approvedBy:
+          type: string

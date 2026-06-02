@@ -25,6 +25,8 @@ export interface UserProfile {
   role: string;
   /** @nullable */
   locationId?: string | null;
+  /** @nullable */
+  station?: string | null;
 }
 
 export interface AuthResponse {
@@ -122,6 +124,8 @@ export interface CartItem {
   total?: string;
 }
 
+export type TransactionInputTaxBreakdown = { [key: string]: unknown };
+
 export type TransactionInputPaymentMethod = typeof TransactionInputPaymentMethod[keyof typeof TransactionInputPaymentMethod];
 
 
@@ -133,9 +137,11 @@ export const TransactionInputPaymentMethod = {
 
 export interface TransactionInput {
   locationId: string;
+  shiftId?: string;
   items: CartItem[];
   subtotal: string;
   taxAmount: string;
+  taxBreakdown?: TransactionInputTaxBreakdown;
   total: string;
   paymentMethod: TransactionInputPaymentMethod;
   momoPhone?: string;
@@ -237,12 +243,85 @@ export interface Shift {
   endTime?: string | null;
   status: string;
   /** @nullable */
-  openingCash?: string | null;
+  openingFloat?: string | null;
   /** @nullable */
-  closingCash?: string | null;
+  closingFloat?: string | null;
+  /** @nullable */
+  expectedCash?: string | null;
+  /** @nullable */
+  expectedMoMo?: string | null;
+  /** @nullable */
+  expectedCard?: string | null;
+  /** @nullable */
+  actualCash?: string | null;
+  /** @nullable */
+  actualMoMo?: string | null;
+  /** @nullable */
+  actualCard?: string | null;
+  /** @nullable */
+  varianceCash?: string | null;
+  /** @nullable */
+  varianceMoMo?: string | null;
+  /** @nullable */
+  varianceCard?: string | null;
   /** @nullable */
   notes?: string | null;
   createdAt?: string;
+}
+
+export interface OpenShiftInput {
+  userId: string;
+  locationId: string;
+  openingFloat?: string;
+}
+
+export interface CloseShiftInput {
+  shiftId: string;
+  actualCash?: string;
+  actualMoMo?: string;
+  actualCard?: string;
+  closingFloat?: string;
+}
+
+export type ShiftCloseResultExpected = {
+  cash?: string;
+  momo?: string;
+  card?: string;
+};
+
+export type ShiftCloseResultActual = {
+  cash?: number;
+  momo?: number;
+  card?: number;
+};
+
+export type ShiftCloseResultVariance = {
+  cash?: number;
+  momo?: number;
+  card?: number;
+};
+
+export interface ShiftCloseResult {
+  shift: Shift;
+  expected: ShiftCloseResultExpected;
+  actual: ShiftCloseResultActual;
+  variance: ShiftCloseResultVariance;
+}
+
+export interface PinLoginInput {
+  username: string;
+  /**
+     * @minLength 4
+     * @maxLength 6
+     */
+  pin: string;
+}
+
+export interface OverrideResponse {
+  overrideToken: string;
+  managerId: string;
+  managerName: string;
+  expiresIn: string;
 }
 
 export interface TransferInput {
@@ -335,6 +414,82 @@ export interface MoMoStatus {
 
 export interface SettingsMap {[key: string]: string}
 
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  /** @nullable */
+  locationId?: string | null;
+  /** @nullable */
+  station?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UserInput {
+  username: string;
+  email: string;
+  password: string;
+  pin?: string;
+  role: string;
+  locationId?: string;
+  station?: string;
+}
+
+export interface UserUpdate {
+  email?: string;
+  role?: string;
+  locationId?: string;
+  station?: string;
+  isActive?: boolean;
+  password?: string;
+  pin?: string;
+}
+
+export type AuditLogOldValues = { [key: string]: unknown };
+
+export type AuditLogNewValues = { [key: string]: unknown };
+
+export interface AuditLog {
+  id: string;
+  /** @nullable */
+  userId?: string | null;
+  /** @nullable */
+  userName?: string | null;
+  /** @nullable */
+  approvedBy?: string | null;
+  /** @nullable */
+  approverName?: string | null;
+  action: string;
+  /** @nullable */
+  tableName?: string | null;
+  /** @nullable */
+  recordId?: string | null;
+  oldValues?: AuditLogOldValues;
+  newValues?: AuditLogNewValues;
+  /** @nullable */
+  ipAddress?: string | null;
+  /** @nullable */
+  userAgent?: string | null;
+  createdAt: string;
+}
+
+export type AuditLogInputOldValues = { [key: string]: unknown };
+
+export type AuditLogInputNewValues = { [key: string]: unknown };
+
+export interface AuditLogInput {
+  userId?: string;
+  action: string;
+  tableName?: string;
+  recordId?: string;
+  oldValues?: AuditLogInputOldValues;
+  newValues?: AuditLogInputNewValues;
+  approvedBy?: string;
+}
+
 export type ListInventoryParams = {
 locationId?: string;
 categoryId?: string;
@@ -387,5 +542,24 @@ days?: number;
 export type GetTopItemsParams = {
 locationId?: string;
 limit?: number;
+};
+
+export type ListUsersParams = {
+role?: string;
+locationId?: string;
+};
+
+export type ListAuditLogsParams = {
+action?: string;
+userId?: string;
+limit?: number;
+offset?: number;
+};
+
+export type MomoWebhookBody = {
+  reference?: string;
+  status?: string;
+  amount?: string;
+  phone?: string;
 };
 

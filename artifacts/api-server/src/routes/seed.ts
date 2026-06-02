@@ -17,9 +17,23 @@ router.post("/", async (_req, res) => {
 
     // Admin user
     const passwordHash = await bcrypt.hash("admin123", 10);
-    await db.insert(usersTable).values({ username: "admin", email: "admin@mirrortech.gh", passwordHash, role: "admin" }).onConflictDoNothing();
-    await db.insert(usersTable).values({ username: "cashier1", email: "cashier1@mirrortech.gh", passwordHash: await bcrypt.hash("cash123", 10), role: "cashier", locationId: loc1Id }).onConflictDoNothing();
-    await db.insert(usersTable).values({ username: "manager1", email: "manager@mirrortech.gh", passwordHash: await bcrypt.hash("mgr123", 10), role: "manager", locationId: loc1Id }).onConflictDoNothing();
+    const pinHash = await bcrypt.hash("1234", 10);
+    await db.insert(usersTable).values({ username: "admin", email: "admin@mirrortech.gh", passwordHash, pinHash, role: "admin" }).onConflictDoUpdate({
+      target: usersTable.username,
+      set: { passwordHash, pinHash, role: "admin", updatedAt: new Date() }
+    });
+    await db.insert(usersTable).values({ username: "cashier1", email: "cashier1@mirrortech.gh", passwordHash: await bcrypt.hash("cash123", 10), pinHash: await bcrypt.hash("1234", 10), role: "cashier", locationId: loc1Id, station: "Counter 1" }).onConflictDoUpdate({
+      target: usersTable.username,
+      set: { passwordHash: await bcrypt.hash("cash123", 10), pinHash: await bcrypt.hash("1234", 10), role: "cashier", locationId: loc1Id, station: "Counter 1", updatedAt: new Date() }
+    });
+    await db.insert(usersTable).values({ username: "cashier2", email: "cashier2@mirrortech.gh", passwordHash: await bcrypt.hash("cash123", 10), pinHash: await bcrypt.hash("4321", 10), role: "cashier", locationId: loc2Id, station: "Counter 2" }).onConflictDoUpdate({
+      target: usersTable.username,
+      set: { passwordHash: await bcrypt.hash("cash123", 10), pinHash: await bcrypt.hash("4321", 10), role: "cashier", locationId: loc2Id, station: "Counter 2", updatedAt: new Date() }
+    });
+    await db.insert(usersTable).values({ username: "manager1", email: "manager@mirrortech.gh", passwordHash: await bcrypt.hash("mgr123", 10), pinHash: await bcrypt.hash("5678", 10), role: "manager", locationId: loc1Id }).onConflictDoUpdate({
+      target: usersTable.username,
+      set: { passwordHash: await bcrypt.hash("mgr123", 10), pinHash: await bcrypt.hash("5678", 10), role: "manager", locationId: loc1Id, updatedAt: new Date() }
+    });
 
     // Categories
     const [catElec] = await db.insert(categoriesTable).values({ name: "Electronics", description: "Electronic devices and accessories" }).returning().onConflictDoNothing() as any;
@@ -43,7 +57,10 @@ router.post("/", async (_req, res) => {
         { name: "Rice (5kg)", sku: "RICE-5KG-008", price: "55.00", cost: "40.00", quantity: 80, minQuantity: 20, locationId: loc1Id, categoryId: catIds[2], unit: "bag" },
         { name: "Electric Kettle", sku: "KTL-EL-009", price: "95.00", cost: "55.00", quantity: 15, minQuantity: 3, locationId: loc1Id, categoryId: catIds[3], unit: "piece" },
         { name: "Ceiling Fan 52\"", sku: "FAN-52-010", price: "280.00", cost: "180.00", quantity: 8, minQuantity: 2, locationId: loc1Id, categoryId: catIds[3], unit: "piece" },
-      ]).onConflictDoNothing();
+      ]).onConflictDoUpdate({
+        target: inventoryTable.sku,
+        set: { updatedAt: new Date() }
+      });
     }
 
     logger.info("Seed data created");

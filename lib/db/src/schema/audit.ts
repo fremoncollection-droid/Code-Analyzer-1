@@ -6,6 +6,7 @@ import { usersTable } from "./users";
 export const auditLogTable = pgTable("audit_log", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").references(() => usersTable.id),
+  approvedBy: uuid("approved_by").references(() => usersTable.id),
   action: varchar("action", { length: 100 }).notNull(),
   tableName: varchar("table_name", { length: 100 }),
   recordId: uuid("record_id"),

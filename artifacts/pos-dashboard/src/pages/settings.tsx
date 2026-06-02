@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Plus, Database, Shield, User, MapPin, Percent } from "lucide-react";
+import { Building2, Plus, Database, Shield, User, MapPin, Percent, Receipt } from "lucide-react";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -18,10 +18,16 @@ export default function SettingsPage() {
   const [locationDialog, setLocationDialog] = useState(false);
   const [locForm, setLocForm] = useState({ name: "", address: "", phone: "" });
   const [vatRate, setVatRate] = useState<string>("");
+  const [nhilRate, setNhilRate] = useState<string>("");
+  const [getFundRate, setGetFundRate] = useState<string>("");
+  const [covidRate, setCovidRate] = useState<string>("");
 
   const { data: locations } = useListLocations();
   const { data: settings } = useGetSettings();
   const currentVat = settings?.vat_rate ?? "15";
+  const currentNhil = settings?.nhil_rate ?? "2.5";
+  const currentGetFund = settings?.getfund_rate ?? "2.5";
+  const currentCovid = settings?.covid_rate ?? "1";
 
   const createLocation = useCreateLocation({
     mutation: {
@@ -146,34 +152,49 @@ export default function SettingsPage() {
                 <p className="text-xs text-muted-foreground">Current: {currentVat}% VAT</p>
               </div>
               <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={0.5}
-                  value={vatRate}
-                  onChange={e => setVatRate(e.target.value)}
-                  placeholder={currentVat}
-                  className="w-20 h-8 text-sm"
-                />
+                <Input type="number" min={0} max={100} step={0.5} value={vatRate} onChange={e => setVatRate(e.target.value)} placeholder={currentVat} className="w-20 h-8 text-sm" />
                 <span className="text-sm text-muted-foreground">%</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const rate = parseFloat(vatRate);
-                    if (isNaN(rate) || rate < 0 || rate > 100) {
-                      toast({ title: "Invalid VAT rate", variant: "destructive" });
-                      return;
-                    }
-                    updateSettings.mutate({ data: { vat_rate: String(rate) } });
-                    setVatRate("");
-                  }}
-                  disabled={updateSettings.isPending || !vatRate}
-                >
+                <Button size="sm" variant="outline" onClick={() => {
+                  const rate = parseFloat(vatRate);
+                  if (isNaN(rate) || rate < 0 || rate > 100) { toast({ title: "Invalid VAT rate", variant: "destructive" }); return; }
+                  updateSettings.mutate({ data: { vat_rate: String(rate) } }); setVatRate("");
+                }} disabled={updateSettings.isPending || !vatRate}>
                   <Percent className="w-3 h-3 mr-1" /> Save
                 </Button>
               </div>
+            </div>
+            <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+              <p className="text-sm font-medium flex items-center gap-2"><Receipt className="w-4 h-4" /> Multi-Tax Breakdown</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-2">
+                  <Input type="number" min={0} max={100} step={0.5} value={nhilRate} onChange={e => setNhilRate(e.target.value)} placeholder={currentNhil} className="w-20 h-8 text-sm" />
+                  <span className="text-sm text-muted-foreground">% NHIL</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input type="number" min={0} max={100} step={0.5} value={getFundRate} onChange={e => setGetFundRate(e.target.value)} placeholder={currentGetFund} className="w-20 h-8 text-sm" />
+                  <span className="text-sm text-muted-foreground">% GETFund</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input type="number" min={0} max={100} step={0.5} value={covidRate} onChange={e => setCovidRate(e.target.value)} placeholder={currentCovid} className="w-20 h-8 text-sm" />
+                  <span className="text-sm text-muted-foreground">% COVID</span>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => {
+                const updates: Record<string, string> = {};
+                const vat = parseFloat(vatRate);
+                const nhil = parseFloat(nhilRate);
+                const getfund = parseFloat(getFundRate);
+                const covid = parseFloat(covidRate);
+                if (vatRate && !isNaN(vat)) updates.vat_rate = String(vat);
+                if (nhilRate && !isNaN(nhil)) updates.nhil_rate = String(nhil);
+                if (getFundRate && !isNaN(getfund)) updates.getfund_rate = String(getfund);
+                if (covidRate && !isNaN(covid)) updates.covid_rate = String(covid);
+                if (Object.keys(updates).length === 0) { toast({ title: "Nothing to save", variant: "destructive" }); return; }
+                updateSettings.mutate({ data: updates });
+                setVatRate(""); setNhilRate(""); setGetFundRate(""); setCovidRate("");
+              }} disabled={updateSettings.isPending || (!vatRate && !nhilRate && !getFundRate && !covidRate)}>
+                <Percent className="w-3 h-3 mr-1" /> Save Tax Rates
+              </Button>
             </div>
           </CardContent>
         </Card>

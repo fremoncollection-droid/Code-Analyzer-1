@@ -11,6 +11,8 @@ import analyticsRouter from "./analytics";
 import momoRouter from "./momo";
 import seedRouter from "./seed";
 import settingsRouter from "./settings";
+import auditRouter from "./audit";
+import usersRouter from "./users";
 
 const router: IRouter = Router();
 
@@ -26,5 +28,7 @@ router.use("/analytics", analyticsRouter);
 router.use("/momo", momoRouter);
 router.use("/seed", seedRouter);
 router.use("/settings", settingsRouter);
+router.use("/audit", auditRouter);
+router.use("/users", usersRouter);
 
 export default router;

@@ -13,17 +13,20 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Receipt, Banknote, Smartphone, CreditCard, XCircle, Eye } from "lucide-react";
 import ReceiptModal from "@/components/receipt-modal";
+import ManagerOverrideModal from "@/components/manager-override-modal";
 
 const PAYMENT_ICONS: Record<string, any> = { cash: Banknote, momo: Smartphone, card: CreditCard };
 
 export default function TransactionsPage() {
-  const { selectedLocationId } = useAuth();
+  const { user, selectedLocationId } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [voidDialog, setVoidDialog] = useState<{ id: string; receipt: string } | null>(null);
   const [voidReason, setVoidReason] = useState("");
   const [receiptId, setReceiptId] = useState<string | null>(null);
+  const [overrideModal, setOverrideModal] = useState(false);
+  const [overrideToken, setOverrideToken] = useState<string | null>(null);
 
   const { data, isLoading } = useListTransactions({
     locationId: selectedLocationId ?? undefined,
@@ -37,6 +40,7 @@ export default function TransactionsPage() {
         qc.invalidateQueries({ queryKey: ["/api/transactions"] });
         setVoidDialog(null);
         setVoidReason("");
+        setOverrideToken(null);
         toast({ title: "Transaction voided" });
       },
       onError: () => toast({ title: "Failed to void", variant: "destructive" }),
@@ -44,6 +48,21 @@ export default function TransactionsPage() {
   });
 
   const transactions = data?.data ?? [];
+  const isCashier = user?.role === "cashier";
+
+  function startVoid(tx: { id: string; receiptNumber: string }) {
+    setVoidDialog({ id: tx.id, receipt: tx.receiptNumber });
+    if (isCashier) {
+      setOverrideModal(true);
+    }
+  }
+
+  function handleVoidSubmit() {
+    if (!voidDialog) return;
+    const payload: any = { reason: voidReason };
+    if (overrideToken) payload.overrideToken = overrideToken;
+    voidTx.mutate({ id: voidDialog.id, data: payload });
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -119,7 +138,7 @@ export default function TransactionsPage() {
                         </Button>
                         {!tx.isVoided && (
                           <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                            onClick={() => setVoidDialog({ id: tx.id, receipt: tx.receiptNumber })}>
+                            onClick={() => startVoid(tx)}>
                             <XCircle className="w-3 h-3" />
                           </Button>
                         )}
@@ -137,7 +156,7 @@ export default function TransactionsPage() {
       </Card>
 
       {/* Void dialog */}
-      <Dialog open={!!voidDialog} onOpenChange={() => setVoidDialog(null)}>
+      <Dialog open={!!voidDialog && !overrideModal} onOpenChange={() => setVoidDialog(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Void Transaction</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">
@@ -152,13 +171,21 @@ export default function TransactionsPage() {
             <Button
               variant="destructive"
               disabled={!voidReason || voidTx.isPending}
-              onClick={() => voidDialog && voidTx.mutate({ id: voidDialog.id, data: { reason: voidReason } })}
+              onClick={handleVoidSubmit}
             >
               Void Transaction
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Manager override modal */}
+      <ManagerOverrideModal
+        open={overrideModal}
+        onClose={() => setOverrideModal(false)}
+        actionLabel="Void Transaction"
+        onSuccess={(token) => { setOverrideToken(token); setOverrideModal(false); }}
+      />
 
       {receiptId && (
         <ReceiptModal open={!!receiptId} onClose={() => setReceiptId(null)} transactionId={receiptId} />

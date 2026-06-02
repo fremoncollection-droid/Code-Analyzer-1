@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useListInventory, useListCategories, useCreateTransaction, useInitiateMoMo, useGetMoMoStatus, useGetSettings } from "@workspace/api-client-react";
+import { useListInventory, useListCategories, useListLocations, useCreateTransaction, useInitiateMoMo, useGetMoMoStatus, useGetSettings, useGetActiveShift, useOpenShift } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -15,13 +15,40 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, Smartphone,
   Wifi, WifiOff, CheckCircle2, X, ScanBarcode, ChevronUp,
-  Package, Send
+  Package, Send, Clock
 } from "lucide-react";
 import ReceiptModal from "@/components/receipt-modal";
 
-function getTaxRate(settings: Record<string, string> | undefined): number {
-  const rate = parseFloat(settings?.vat_rate ?? "15");
-  return isNaN(rate) ? 0.15 : rate / 100;
+interface TaxRates {
+  vat: number;
+  nhil: number;
+  getFund: number;
+  covid: number;
+}
+
+function getTaxRates(settings: Record<string, string> | undefined): TaxRates {
+  return {
+    vat: (parseFloat(settings?.vat_rate ?? "15") || 15) / 100,
+    nhil: (parseFloat(settings?.nhil_rate ?? "2.5") || 2.5) / 100,
+    getFund: (parseFloat(settings?.getfund_rate ?? "2.5") || 2.5) / 100,
+    covid: (parseFloat(settings?.covid_rate ?? "1") || 1) / 100,
+  };
+}
+
+interface TaxBreakdown {
+  vat: number;
+  nhil: number;
+  getFund: number;
+  covid: number;
+  totalTax: number;
+}
+
+function computeTaxBreakdown(subtotal: number, rates: TaxRates): TaxBreakdown {
+  const vat = subtotal * rates.vat;
+  const nhil = subtotal * rates.nhil;
+  const getFund = subtotal * rates.getFund;
+  const covid = subtotal * rates.covid;
+  return { vat, nhil, getFund, covid, totalTax: vat + nhil + getFund + covid };
 }
 
 interface CartItem {
@@ -81,9 +108,32 @@ export default function POSPage() {
     search: search || undefined,
     categoryId: selectedCategory ?? undefined,
   });
+  const { data: locations } = useListLocations();
   const { data: settings } = useGetSettings();
-  const taxRate = getTaxRate(settings as any);
-  const vatLabel = `VAT (${(taxRate * 100).toFixed(0)}%)`;
+  // Active shift
+  const { data: activeShift } = useGetActiveShift(user?.id ?? "", {
+    query: { enabled: !!user?.id } as any,
+  });
+  const [shiftOpenDialog, setShiftOpenDialog] = useState(false);
+  const [openingFloat, setOpeningFloat] = useState("");
+  const openShift = useOpenShift({
+    mutation: {
+      onSuccess: (shift) => {
+        setShiftOpenDialog(false);
+        setOpeningFloat("");
+        toast({ title: "Shift opened", description: `Started at ${shift.locationName}` });
+        qc.invalidateQueries({ queryKey: ["/api/shifts/active"] });
+      },
+      onError: (err: any) => {
+        if (err?.error?.includes("already has an active shift")) {
+          toast({ title: "Shift already active", description: "You have an open shift" });
+          qc.invalidateQueries({ queryKey: ["/api/shifts/active"] });
+        } else {
+          toast({ title: "Could not open shift", description: err.message, variant: "destructive" });
+        }
+      },
+    },
+  });
 
   const createTx = useCreateTransaction({
     mutation: {
@@ -119,7 +169,9 @@ export default function POSPage() {
 
   // --- Computed ---
   const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  const taxAmount = subtotal * taxRate;
+  const taxRates = getTaxRates(settings as any);
+  const taxBreakdown = computeTaxBreakdown(subtotal, taxRates);
+  const taxAmount = taxBreakdown.totalTax;
   const total = subtotal + taxAmount;
   const momoConfirmed = momoStatus?.status === "successful";
 
@@ -272,9 +324,16 @@ export default function POSPage() {
   function buildTxPayload() {
     return {
       locationId: selectedLocationId!,
+      shiftId: activeShift?.id ?? undefined,
       items: cart.map(i => ({ itemId: i.itemId, name: i.name, quantity: i.quantity, price: i.price.toFixed(2), total: (i.price * i.quantity).toFixed(2) })),
       subtotal: subtotal.toFixed(2),
       taxAmount: taxAmount.toFixed(2),
+      taxBreakdown: {
+        vat: taxBreakdown.vat.toFixed(2),
+        nhil: taxBreakdown.nhil.toFixed(2),
+        getFund: taxBreakdown.getFund.toFixed(2),
+        covid: taxBreakdown.covid.toFixed(2),
+      },
       total: total.toFixed(2),
       paymentMethod,
       momoPhone: paymentMethod === "momo" ? momoPhone : undefined,
@@ -411,6 +470,11 @@ export default function POSPage() {
             {offlineCount > 0 && (
               <Badge variant="outline" className="text-xs text-amber-600 border-amber-200">{offlineCount} queued</Badge>
             )}
+            {activeShift ? (
+              <Badge variant="outline" className="text-xs text-teal-700 border-teal-200 bg-teal-50/50"><Clock className="w-3 h-3 mr-1" /> Shift active</Badge>
+            ) : (
+              <button onClick={() => setShiftOpenDialog(true)} className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"><Clock className="w-3 h-3" /> No shift · Open</button>
+            )}
           </div>
           <span className="text-xs text-muted-foreground">{filtered.length} items</span>
         </div>
@@ -534,9 +598,27 @@ export default function POSPage() {
               <span className="tabular-nums">{formatCurrency(subtotal)}</span>
             </div>
             <div className="flex justify-between text-muted-foreground">
-              <span>{vatLabel}</span>
-              <span className="tabular-nums">{formatCurrency(taxAmount)}</span>
+              <span>VAT ({(taxRates.vat * 100).toFixed(1)}%)</span>
+              <span className="tabular-nums">{formatCurrency(taxBreakdown.vat)}</span>
             </div>
+            {taxBreakdown.nhil > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>NHIL ({(taxRates.nhil * 100).toFixed(1)}%)</span>
+                <span className="tabular-nums">{formatCurrency(taxBreakdown.nhil)}</span>
+              </div>
+            )}
+            {taxBreakdown.getFund > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>GETFund ({(taxRates.getFund * 100).toFixed(1)}%)</span>
+                <span className="tabular-nums">{formatCurrency(taxBreakdown.getFund)}</span>
+              </div>
+            )}
+            {taxBreakdown.covid > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>COVID ({(taxRates.covid * 100).toFixed(1)}%)</span>
+                <span className="tabular-nums">{formatCurrency(taxBreakdown.covid)}</span>
+              </div>
+            )}
             <Separator />
             <div className="flex justify-between font-bold text-base">
               <span>Total</span>
@@ -653,7 +735,10 @@ export default function POSPage() {
           <div className="shrink-0 border-t border-border p-3 space-y-3">
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span className="tabular-nums">{formatCurrency(subtotal)}</span></div>
-              <div className="flex justify-between text-muted-foreground"><span>{vatLabel}</span><span className="tabular-nums">{formatCurrency(taxAmount)}</span></div>
+              <div className="flex justify-between text-muted-foreground"><span>VAT</span><span className="tabular-nums">{formatCurrency(taxBreakdown.vat)}</span></div>
+              {taxBreakdown.nhil > 0 && <div className="flex justify-between text-muted-foreground"><span>NHIL</span><span className="tabular-nums">{formatCurrency(taxBreakdown.nhil)}</span></div>}
+              {taxBreakdown.getFund > 0 && <div className="flex justify-between text-muted-foreground"><span>GETFund</span><span className="tabular-nums">{formatCurrency(taxBreakdown.getFund)}</span></div>}
+              {taxBreakdown.covid > 0 && <div className="flex justify-between text-muted-foreground"><span>COVID</span><span className="tabular-nums">{formatCurrency(taxBreakdown.covid)}</span></div>}
               <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-primary tabular-nums">{formatCurrency(total)}</span></div>
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -687,7 +772,10 @@ export default function POSPage() {
             {/* Bill Summary */}
             <div className="bg-muted rounded-lg p-3 space-y-1 text-sm">
               <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span className="tabular-nums">{formatCurrency(subtotal)}</span></div>
-              <div className="flex justify-between text-muted-foreground"><span>{vatLabel}</span><span className="tabular-nums">{formatCurrency(taxAmount)}</span></div>
+              <div className="flex justify-between text-muted-foreground"><span>VAT ({(taxRates.vat * 100).toFixed(1)}%)</span><span className="tabular-nums">{formatCurrency(taxBreakdown.vat)}</span></div>
+              {taxBreakdown.nhil > 0 && <div className="flex justify-between text-muted-foreground"><span>NHIL ({(taxRates.nhil * 100).toFixed(1)}%)</span><span className="tabular-nums">{formatCurrency(taxBreakdown.nhil)}</span></div>}
+              {taxBreakdown.getFund > 0 && <div className="flex justify-between text-muted-foreground"><span>GETFund ({(taxRates.getFund * 100).toFixed(1)}%)</span><span className="tabular-nums">{formatCurrency(taxBreakdown.getFund)}</span></div>}
+              {taxBreakdown.covid > 0 && <div className="flex justify-between text-muted-foreground"><span>COVID ({(taxRates.covid * 100).toFixed(1)}%)</span><span className="tabular-nums">{formatCurrency(taxBreakdown.covid)}</span></div>}
               <Separator className="my-1" />
               <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-primary tabular-nums">{formatCurrency(total)}</span></div>
               <div className="text-xs text-muted-foreground mt-1">{cartItemCount} items · {paymentMethod.toUpperCase()}</div>
@@ -787,6 +875,36 @@ export default function POSPage() {
               <X className="w-4 h-4" />
             </button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ============ SHIFT OPEN DIALOG ============ */}
+      <Dialog open={shiftOpenDialog} onOpenChange={setShiftOpenDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Clock className="w-4 h-4" /> Open Shift</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Opening Float (₵)</Label>
+              <Input type="number" min="0" step="0.01" value={openingFloat} onChange={e => setOpeningFloat(e.target.value)} placeholder="0.00" className="h-8 text-sm" />
+            </div>
+            <div className="bg-muted/50 rounded p-2 text-xs text-muted-foreground">
+              Location: {locations?.find(l => l.id === selectedLocationId)?.name ?? "No location selected"}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShiftOpenDialog(false)}>Cancel</Button>
+            <Button
+              disabled={!selectedLocationId || !openingFloat || openShift.isPending}
+              onClick={() => {
+                if (!user?.id || !selectedLocationId) return;
+                openShift.mutate({ data: { userId: user.id, locationId: selectedLocationId, openingFloat } });
+              }}
+            >
+              {openShift.isPending ? "Opening..." : "Open Shift"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

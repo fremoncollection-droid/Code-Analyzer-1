@@ -1,0 +1,50 @@
+Act as a Principal Software Architect and Security Engineer specializing in retail ERP and Point of Sale (POS) backend management systems.
+
+I need to build the Administrator Management Module for my web application to control, monitor, and audit over-the-counter salespeople (cashiers). The system must enforce strict financial security, prevent internal fraud, and track daily cash desk shifts.
+
+Please generate the complete database schema definitions, API endpoints, backend logic, and frontend state flows based on these four core pillars:
+
+1. ROLE-BASED ACCESS CONTROL (RBAC) & AUTHORIZATION:
+- Design a relational schema or user model that supports three distinct roles: `Admin`, `Manager`, and `Cashier`.
+- Create a middleware function or authorization decorator to restrict access. `Cashier` users must be strictly blocked from viewing profit margins, editing base product prices, viewing store-wide total analytics, or deleting user accounts.
+
+2. SHIFT LIFE-CYCLE & BLIND RECONCILIATION ENGINE:
+Implement a backend workflow and API endpoints (`/shifts/open`, `/shifts/close`, `/shifts/reconcile`) to manage salesperson cash handling:
+- Open Shift: Requires the salesperson to input an initial "Opening Float" (starting cash for change). Log the timestamp and Cashier ID.
+- Live Tracking: While a shift is active, automatically accumulate total cash sales, total Mobile Money sales, and total card sales into a running system total attached to that specific shift ID.
+- Close Shift (Blind Drop): When closing, the webpage must prompt the cashier to manually enter physical counts for cash, MoMo slips, and card payments. Do NOT expose the system's expected totals to the cashier on this screen.
+- Discrepancy Calculation: Upon submission, the backend must mathematically compare the cashier's inputted figures against the system's recorded tracking. Calculate the exact `Variance` (Shortage/Overage) and log it permanently for Admin review.
+
+3. REAL-TIME MANAGER OVERRIDE SYSTEM:
+- Implement a real-time validation mechanism for restricted storefront actions (e.g., Voiding an active item from a cart, applying a manual discount, or issuing a refund).
+- If a cashier clicks a restricted action, the application must freeze the operation and display a secure modal. The modal must require an active `Manager` or `Admin` to input their specific secure PIN or password to authorize and sign off on that single, specific action before the cart can proceed.
+
+4. CRITICAL AUDIT TRAIL LOGGING:
+- Design an immutable database log table (`audit_trails`) that automatically captures high-risk actions. 
+- Every entry must securely record: `timestamp`, `user_id` (the active cashier), `action_type` (e.g., ITEM_VOIDED, PRICE_OVERRIDE, SHIFT_CLOSED), `metadata` (JSON payload containing old values vs new values), and `approved_by` (the manager's user ID if an override occurred).
+
+5.User Interaction & Feature Specifications:
+- Manager Override: Implement a quick, modal-based 4-digit PIN authentication interface directly on the cashier's screen. The frontend must securely validate this PIN against the backend without interrupting the cashier’s active checkout session or caching the manager's credentials.
+- Cashier Management Dashboard (Admin UI): Provide a dedicated administrative interface to Create, Read, Update, and Delete (CRUD) cashier accounts. 
+- Live Employee Logs: Include a detailed, filterable data table within the admin panel showing:
+  * Real-time Login/Logout timestamps and device IPs.
+  * Active shift indicators showing who is currently on which cash counter.
+  * Individual itemized sales histories filtered by the current day, week, or custom date range.
+- Design Preference: Tailwind CSS table layouts with clean status badges (e.g., Active, Shift Closed, Over/Short) for instant scanning by the store owner.
+
+6.Everyday Cashier Login System:
+- Authentication Interface: Build a dedicated numeric keypad (0-9) UI layout designed for quick touchscreens or numeric keyboard input. 
+- Fast PIN Login Logic: Cashiers must log in using a 4-to-6 digit numeric passcode rather than an email and password.
+- Multi-Tenant Station Isolation: Ensure the frontend allows the cashier to first select their Station/Counter Number or Name, then input their unique staff PIN to initiate an active shift session.
+- PIN Security Implementation: The system must automatically hash and verify the PIN on the backend server. To prevent brute-force attacks on short numeric PINs, implement a rate-limiting mechanism that locks out the account or counter terminal for 5 minutes after 3 consecutive failed login attempts.
+
+7. MISSING RETIAL LOCALIZATION COMPONENTS:
+- Tax & GRA Compliance: The backend database schema and transaction endpoints must include explicit columns/logic for calculating and storing individual GRA tax lines: standard cascading levies (15% VAT, 2.5% NHIL, 2.5% GETFund, 1% Covid) or 4% Flat Rate (VFRS).
+- MoMo Webhook Scaffolding: Provide a mock transaction verification route (`/payments/momo/webhook`) to handle asynchronous payment success responses from Ghanaian aggregators like Hubtel or Paystack.
+- UI Responsiveness Rule: The React layout must feature a desktop dual-column mode (min-width: 1024px) for supermarket monitors, but automatically stack into a single-column thumb-friendly view with a slide-up cart drawer on mobile screens.
+
+Tech Stack Preferences:
+- Frontend Language/Framework: React with Tailwind CSS
+- Backend Runtime / Database: Express 5 (Node.js)
+
+Please provide production-ready database schemas (or ORM models), backend API endpoints with validation, and explain how to securely handle the manager override token or session verification on the frontend.

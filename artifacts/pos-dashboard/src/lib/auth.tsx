@@ -7,6 +7,7 @@ export interface AuthUser {
   email: string;
   role: string;
   locationId: string | null;
+  station?: string | null;
 }
 
 interface AuthContextValue {

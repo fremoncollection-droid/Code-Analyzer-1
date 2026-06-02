@@ -13,6 +13,8 @@ import AnalyticsPage from "@/pages/analytics";
 import TransfersPage from "@/pages/transfers";
 import ShiftsPage from "@/pages/shifts";
 import SettingsPage from "@/pages/settings";
+import CashiersPage from "@/pages/cashiers";
+import AuditPage from "@/pages/audit";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -34,6 +36,8 @@ function AuthenticatedApp() {
         <Route path="/analytics" component={AnalyticsPage} />
         <Route path="/transfers" component={TransfersPage} />
         <Route path="/shifts" component={ShiftsPage} />
+        <Route path="/cashiers" component={CashiersPage} />
+        <Route path="/audit" component={AuditPage} />
         <Route path="/settings" component={SettingsPage} />
         <Route component={NotFound} />
       </Switch>

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, transactionsTable, inventoryTable, locationsTable, usersTable } from "@workspace/db";
+import { db, transactionsTable, inventoryTable, locationsTable, usersTable, auditLogTable } from "@workspace/db";
 import { eq, and, gte, lte, desc, count, sql } from "drizzle-orm";
 import { authenticateToken } from "../middleware/auth";
 import { nanoid } from "nanoid";
@@ -111,8 +111,9 @@ router.get("/", authenticateToken, async (req, res) => {
 router.post("/", authenticateToken, async (req, res) => {
   const body = req.body as {
     locationId?: string; items?: any[]; subtotal?: string; taxAmount?: string;
-    total?: string; paymentMethod?: string; momoPhone?: string; momoNetwork?: string;
+    taxBreakdown?: any; total?: string; paymentMethod?: string; momoPhone?: string; momoNetwork?: string;
     momoReference?: string; customerName?: string; customerPhone?: string; notes?: string;
+    shiftId?: string;
   };
 
   if (!body.locationId || !body.items || !body.subtotal || !body.total || !body.paymentMethod) {
@@ -127,9 +128,11 @@ router.post("/", authenticateToken, async (req, res) => {
     receiptNumber,
     locationId: body.locationId,
     cashierId,
+    shiftId: body.shiftId ?? null,
     items: body.items,
     subtotal: body.subtotal,
     taxAmount: body.taxAmount ?? "0",
+    taxBreakdown: body.taxBreakdown ?? null,
     total: body.total,
     paymentMethod: body.paymentMethod,
     paymentStatus: body.paymentMethod === "momo" ? "pending" : "completed",
@@ -167,6 +170,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
       items: transactionsTable.items,
       subtotal: transactionsTable.subtotal,
       taxAmount: transactionsTable.taxAmount,
+      taxBreakdown: transactionsTable.taxBreakdown,
       total: transactionsTable.total,
       paymentMethod: transactionsTable.paymentMethod,
       paymentStatus: transactionsTable.paymentStatus,
@@ -195,15 +199,38 @@ router.get("/:id", authenticateToken, async (req, res) => {
 
 router.post("/:id/void", authenticateToken, async (req, res) => {
   const id = String(req.params.id);
-  const { reason } = req.body as { reason?: string };
+  const { reason, overrideToken } = req.body as { reason?: string; overrideToken?: string };
   if (!reason) {
     res.status(400).json({ error: "reason required" });
     return;
   }
 
+  const user = (req as any).user;
+  const isCashier = user.role === "cashier";
+  let approvedBy: string | null = null;
+
+  if (isCashier) {
+    if (!overrideToken) {
+      res.status(403).json({ error: "Manager override required for void" });
+      return;
+    }
+    try {
+      const jwt = require("jsonwebtoken");
+      const payload = jwt.verify(overrideToken, process.env.JWT_SECRET ?? "mirrortech-dev-secret") as any;
+      if (payload.type !== "override" || (payload.role !== "manager" && payload.role !== "admin")) {
+        res.status(403).json({ error: "Invalid override token" });
+        return;
+      }
+      approvedBy = payload.id;
+    } catch {
+      res.status(403).json({ error: "Invalid or expired override token" });
+      return;
+    }
+  }
+
   const [tx] = await db
     .update(transactionsTable)
-    .set({ isVoided: true, voidReason: reason })
+    .set({ isVoided: true, voidReason: reason, approvedBy: approvedBy ?? null })
     .where(eq(transactionsTable.id, id))
     .returning();
 
@@ -211,6 +238,21 @@ router.post("/:id/void", authenticateToken, async (req, res) => {
     res.status(404).json({ error: "Transaction not found" });
     return;
   }
+
+  const ip = req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || undefined;
+  await db.insert(auditLogTable).values({
+    userId: user.id,
+    action: "void",
+    tableName: "transactions",
+    recordId: id,
+    oldValues: { isVoided: false, voidReason: null },
+    newValues: { isVoided: true, voidReason: reason },
+    approvedBy: approvedBy ?? null,
+    ipAddress: ip ?? null,
+    userAgent: req.headers["user-agent"] ?? null,
+  });
+
+  req.log.info({ txId: id, userId: user.id, reason, approvedBy }, "Transaction voided");
   res.json(tx);
 });
 

@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, ShoppingCart, Package, CreditCard, BarChart2,
-  ArrowLeftRight, Calendar, Settings, LogOut, Menu, X, Store, ChevronDown
+  ArrowLeftRight, Calendar, Settings, LogOut, Menu, X, Store, ChevronDown,
+  Users, ShieldCheck
 } from "lucide-react";
 import { useListLocations } from "@workspace/api-client-react";
 import {
@@ -23,6 +24,8 @@ const navItems = [
   { path: "/analytics", icon: BarChart2, label: "Analytics" },
   { path: "/transfers", icon: ArrowLeftRight, label: "Transfers" },
   { path: "/shifts", icon: Calendar, label: "Shifts" },
+  { path: "/cashiers", icon: Users, label: "Cashiers", roles: ["admin", "manager"] },
+  { path: "/audit", icon: ShieldCheck, label: "Audit", roles: ["admin", "manager"] },
   { path: "/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -94,7 +97,8 @@ export default function Layout({ children }: { children: ReactNode }) {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navItems.map(({ path, icon: Icon, label }) => {
+          {navItems.map(({ path, icon: Icon, label, roles }) => {
+            if (roles && !roles.includes(user?.role ?? "")) return null;
             const active = location === path || (path !== "/" && location.startsWith(path));
             return (
               <Link key={path} href={path}>

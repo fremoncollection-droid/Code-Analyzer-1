@@ -61,7 +61,7 @@ export default function CashiersPage() {
 
   function openCreate() {
     setEditUser(null);
-    setForm({ username: "", email: "", password: "", pin: "", role: "cashier", locationId: "", station: "", isActive: true });
+    setForm({ username: "", email: "", password: "", pin: "", role: "cashier", locationId: "none", station: "", isActive: true });
     setDialogOpen(true);
   }
 
@@ -69,7 +69,7 @@ export default function CashiersPage() {
     setEditUser(u);
     setForm({
       username: u.username, email: u.email, password: "", pin: "",
-      role: u.role, locationId: u.locationId ?? "", station: u.station ?? "", isActive: u.isActive,
+      role: u.role, locationId: u.locationId ?? "none", station: u.station ?? "", isActive: u.isActive,
     });
     setDialogOpen(true);
   }
@@ -79,7 +79,7 @@ export default function CashiersPage() {
       const updates: any = {};
       if (form.email !== editUser.email) updates.email = form.email;
       if (form.role !== editUser.role) updates.role = form.role;
-      if (form.locationId !== (editUser.locationId ?? "")) updates.locationId = form.locationId || null;
+      if (form.locationId !== (editUser.locationId ?? "none")) updates.locationId = form.locationId === "none" ? null : form.locationId;
       if (form.station !== (editUser.station ?? "")) updates.station = form.station || null;
       if (form.isActive !== editUser.isActive) updates.isActive = form.isActive;
       if (form.password) updates.password = form.password;
@@ -226,7 +226,7 @@ export default function CashiersPage() {
                 <Select value={form.locationId} onValueChange={v => setForm(f => ({ ...f, locationId: v }))}>
                   <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {locations?.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
                   </SelectContent>
                 </Select>

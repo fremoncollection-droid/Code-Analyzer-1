@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Display — MirrorTech POS</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #1a1a2e;
+      color: #ffffff;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    #logo {
+      max-height: 80px;
+      object-fit: contain;
+      margin-bottom: 24px;
+      border-radius: 8px;
+    }
+    #item {
+      font-size: 32px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+      transition: all 0.3s ease;
+    }
+    #total {
+      font-size: 24px;
+      opacity: 0.85;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+    #marketing {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.3);
+      padding: 12px 24px;
+      text-align: center;
+      font-size: 16px;
+    }
+    #marketing.scroll span {
+      display: inline-block;
+      white-space: nowrap;
+      animation: marquee 10s linear infinite;
+    }
+    @keyframes marquee {
+      0% { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+    .idle { opacity: 0.6; }
+    .scan-active { opacity: 1; transform: scale(1.02); }
+    .total-active { color: #10b981; font-size: 40px; }
+  </style>
+</head>
+<body>
+  <img id="logo" style="display:none" alt="Store Logo">
+  <div id="item">Ready to scan</div>
+  <div id="total">Total: ₵0.00</div>
+  <div id="marketing">
+    <span>Thank you for shopping at MirrorTech!</span>
+  </div>
+
+  <script>
+    const CHANNEL = "mirrortech-display";
+    let channel = null;
+    let idleTimer = null;
+    let savedIdle = { message: "Ready to scan", subMessage: "Total: ₵0.00" };
+
+    const els = {
+      item: document.getElementById("item"),
+      total: document.getElementById("total"),
+      logo: document.getElementById("logo"),
+      marketing: document.getElementById("marketing"),
+    };
+
+    function setTheme(t) {
+      document.body.style.background = t.bgColor || "#1a1a2e";
+      document.body.style.color = t.textColor || "#ffffff";
+      els.item.style.fontSize = (t.fontSize || "32") + "px";
+      if (t.logoUrl) {
+        els.logo.src = t.logoUrl;
+        els.logo.style.display = "block";
+      } else {
+        els.logo.style.display = "none";
+      }
+      if (t.marketingText) {
+        els.marketing.querySelector("span").textContent = t.marketingText;
+      }
+      els.marketing.className = t.marketingScroll ? "scroll" : "";
+    }
+
+    function setIdle(msg, sub) {
+      savedIdle = { message: msg, subMessage: sub };
+      els.item.textContent = msg;
+      els.total.textContent = sub;
+      els.item.className = "idle";
+      els.total.className = "";
+    }
+
+    function setScan(name, price) {
+      els.item.textContent = name;
+      els.total.textContent = "Price: ₵" + price;
+      els.item.className = "scan-active";
+      els.total.className = "";
+      resetIdle();
+    }
+
+    function setTotal(total, count) {
+      els.item.textContent = "TOTAL — " + count + " item" + (count > 1 ? "s" : "");
+      els.total.textContent = "Total: ₵" + total;
+      els.item.className = "total-active";
+      els.total.className = "total-active";
+      resetIdle();
+    }
+
+    function resetIdle() {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => setIdle(savedIdle.message, savedIdle.subMessage), 5000);
+    }
+
+    function init() {
+      if (typeof BroadcastChannel === "undefined") {
+        els.item.textContent = "BroadcastChannel not supported";
+        return;
+      }
+      channel = new BroadcastChannel(CHANNEL);
+      channel.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || !d.type) return;
+        switch (d.type) {
+          case "scan":
+            setScan(d.name, d.price);
+            break;
+          case "total":
+            setTotal(d.total, d.itemCount);
+            break;
+          case "idle":
+            setIdle(d.message, d.subMessage);
+            break;
+          case "theme":
+            setTheme(d.theme);
+            break;
+          case "clear":
+            setIdle("Ready to scan", "Total: ₵0.00");
+            break;
+        }
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

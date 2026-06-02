@@ -1,0 +1,42 @@
+Build a complete POS Display Management web application using Vite, React (or Vanilla JS), and Express on Replit. The app must allow me to manage and edit what displays on both a physical hardware Pole Display and an external Secondary Customer Monitor.
+
+### 1. ADMIN DASHBOARD & USER INTERFACE
+Create a clean dashboard with two primary configuration sections:
+
+#### Section A: Pole Display Settings
+- Emulation Selector: Dropdown for hardware protocols (Epson ESC/POS, CD5220, UTC).
+- Layout Text Inputs: Two text input rows capped strictly at 20 characters each.
+- Variable Mapping: Allow me to type dynamic placeholders like {{name}}, {{price}}, and {{total}}.
+- Custom Messages: A text box to type an "Idle/Welcome Message" (e.g., Line 1: "Welcome!", Line 2: "Thanks for shopping").
+
+#### Section B: Secondary Monitor Settings
+- Visual Theme Customizer: Controls to change background colors, font sizes, and upload or paste a logo image URL.
+- Marketing Message Editor: A text area to type a customizable scrolling or static promotional announcement.
+- Live Layout Preview: A visual UI component simulating what the customer sees on their screen.
+
+#### Section C: Live Mock POS Simulator
+- Include a sidebar panel where I can click "Mock Scan Apple ($1.99)" or "Mock Total ($15.50)".
+- Clicking these buttons must instantly update both the Pole Display data pipeline and the Secondary Monitor window.
+
+---
+
+### 2. HARDWARE INTEGRATION CODE (POLE DISPLAY)
+- Implement a frontend JavaScript service utilizing the browser's native 'navigator.serial' API.
+- Create a function 'connectDisplay()' triggered by a UI button click to request COM port access.
+- Include an text-formatting engine that slices strings to a max of 20 characters and pads them with spaces so text never wraps incorrectly on a VFD screen.
+- Provide the exact Hex commands for common protocols:
+  * Epson ESC/POS: Reset = [0x1B, 0x40], Clear = [0x0C]
+  * CD5220: Reset = [0x1B, 0x53], Clear = [0x0C]
+
+---
+
+### 3. SECONDARY MONITOR VIEW
+- Implement a button to "Open Customer Display Window". This must execute 'window.open()' to launch a clean, borderless secondary browser window.
+- Implement real-time cross-window communication using the browser's native 'BroadcastChannel' API.
+- When an item is scanned or edited in the main app dashboard, broadcast a JSON payload so the customer window dynamically rerenders its HTML and CSS instantly.
+
+---
+
+### 4. REPLIT-SPECIFIC RULES
+- Put all client-side browser logic (Web Serial API and Window Broadcasts) in the frontend workspace files, as Node.js backend environments cannot talk directly to a client's physical USB port.
+- Ensure all states (Active Item, Current Total, Saved Idle Messages) sync effortlessly across the dashboard and both display engines.

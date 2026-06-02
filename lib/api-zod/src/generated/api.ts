@@ -1313,3 +1313,363 @@ export const CreateSalesLogBody = zod.object({
 })
 
 
+/**
+ * @summary List leads
+ */
+export const ListLeadsQueryParams = zod.object({
+  "status": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional(),
+  "locationId": zod.coerce.string().optional()
+})
+
+export const ListLeadsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "status": zod.string(),
+  "source": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "estimatedValue": zod.string().nullish(),
+  "assignedTo": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "lastContactedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListLeadsResponse = zod.array(ListLeadsResponseItem)
+
+
+/**
+ * @summary Create a lead
+ */
+export const CreateLeadBody = zod.object({
+  "name": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "email": zod.string().optional(),
+  "status": zod.string().optional(),
+  "source": zod.string().optional(),
+  "notes": zod.string().optional(),
+  "estimatedValue": zod.string().optional(),
+  "assignedTo": zod.string().optional(),
+  "locationId": zod.string().optional()
+})
+
+
+/**
+ * @summary Get a lead
+ */
+export const GetLeadParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetLeadResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "status": zod.string(),
+  "source": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "estimatedValue": zod.string().nullish(),
+  "assignedTo": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "lastContactedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Update a lead
+ */
+export const UpdateLeadParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateLeadBody = zod.object({
+  "name": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "email": zod.string().optional(),
+  "status": zod.string().optional(),
+  "source": zod.string().optional(),
+  "notes": zod.string().optional(),
+  "estimatedValue": zod.string().optional(),
+  "assignedTo": zod.string().optional(),
+  "locationId": zod.string().optional()
+})
+
+export const UpdateLeadResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "status": zod.string(),
+  "source": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "estimatedValue": zod.string().nullish(),
+  "assignedTo": zod.string().nullish(),
+  "locationId": zod.string().nullish(),
+  "lastContactedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a lead
+ */
+export const DeleteLeadParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+/**
+ * @summary Get pipeline summary
+ */
+export const GetPipelineSummaryResponseItem = zod.object({
+  "status": zod.string().optional(),
+  "count": zod.number().optional()
+})
+export const GetPipelineSummaryResponse = zod.array(GetPipelineSummaryResponseItem)
+
+
+/**
+ * @summary List tasks
+ */
+export const ListTasksQueryParams = zod.object({
+  "date": zod.coerce.string().optional(),
+  "completed": zod.coerce.string().optional(),
+  "priority": zod.coerce.string().optional()
+})
+
+export const ListTasksResponseItem = zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "type": zod.string().optional(),
+  "dueDate": zod.string(),
+  "priority": zod.string().optional(),
+  "completed": zod.boolean().optional(),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListTasksResponse = zod.array(ListTasksResponseItem)
+
+
+/**
+ * @summary Create a task
+ */
+export const CreateTaskBody = zod.object({
+  "title": zod.string().optional(),
+  "description": zod.string().optional(),
+  "type": zod.string().optional(),
+  "dueDate": zod.string().optional(),
+  "priority": zod.string().optional(),
+  "userId": zod.string().optional(),
+  "completed": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Update a task
+ */
+export const UpdateTaskParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateTaskBody = zod.object({
+  "title": zod.string().optional(),
+  "description": zod.string().optional(),
+  "type": zod.string().optional(),
+  "dueDate": zod.string().optional(),
+  "priority": zod.string().optional(),
+  "userId": zod.string().optional(),
+  "completed": zod.boolean().optional()
+})
+
+export const UpdateTaskResponse = zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "type": zod.string().optional(),
+  "dueDate": zod.string(),
+  "priority": zod.string().optional(),
+  "completed": zod.boolean().optional(),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a task
+ */
+export const DeleteTaskParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+/**
+ * @summary List discount requests
+ */
+export const ListDiscountRequestsQueryParams = zod.object({
+  "status": zod.coerce.string().optional()
+})
+
+export const ListDiscountRequestsResponseItem = zod.object({
+  "id": zod.string(),
+  "transactionId": zod.string().nullish(),
+  "customerName": zod.string().nullish(),
+  "requestedAmount": zod.string().nullish(),
+  "originalAmount": zod.string().nullish(),
+  "reason": zod.string(),
+  "status": zod.string(),
+  "requestedBy": zod.string().nullish(),
+  "approvedBy": zod.string().nullish(),
+  "approvedAt": zod.string().nullish(),
+  "rejectionReason": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListDiscountRequestsResponse = zod.array(ListDiscountRequestsResponseItem)
+
+
+/**
+ * @summary Create a discount request
+ */
+export const CreateDiscountRequestBody = zod.object({
+  "transactionId": zod.string().optional(),
+  "customerName": zod.string().optional(),
+  "requestedAmount": zod.string(),
+  "originalAmount": zod.string(),
+  "reason": zod.string()
+})
+
+
+/**
+ * @summary Approve a discount request
+ */
+export const ApproveDiscountRequestParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ApproveDiscountRequestResponse = zod.object({
+  "id": zod.string(),
+  "transactionId": zod.string().nullish(),
+  "customerName": zod.string().nullish(),
+  "requestedAmount": zod.string().nullish(),
+  "originalAmount": zod.string().nullish(),
+  "reason": zod.string(),
+  "status": zod.string(),
+  "requestedBy": zod.string().nullish(),
+  "approvedBy": zod.string().nullish(),
+  "approvedAt": zod.string().nullish(),
+  "rejectionReason": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Reject a discount request
+ */
+export const RejectDiscountRequestParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const RejectDiscountRequestBody = zod.object({
+  "rejectionReason": zod.string().optional()
+})
+
+export const RejectDiscountRequestResponse = zod.object({
+  "id": zod.string(),
+  "transactionId": zod.string().nullish(),
+  "customerName": zod.string().nullish(),
+  "requestedAmount": zod.string().nullish(),
+  "originalAmount": zod.string().nullish(),
+  "reason": zod.string(),
+  "status": zod.string(),
+  "requestedBy": zod.string().nullish(),
+  "approvedBy": zod.string().nullish(),
+  "approvedAt": zod.string().nullish(),
+  "rejectionReason": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary List permissions
+ */
+export const ListPermissionsQueryParams = zod.object({
+  "userId": zod.coerce.string().optional()
+})
+
+export const ListPermissionsResponseItem = zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "module": zod.string(),
+  "canView": zod.boolean().optional(),
+  "canCreate": zod.boolean().optional(),
+  "canEdit": zod.boolean().optional(),
+  "canDelete": zod.boolean().optional(),
+  "canApprove": zod.boolean().optional(),
+  "createdAt": zod.string().optional()
+})
+export const ListPermissionsResponse = zod.array(ListPermissionsResponseItem)
+
+
+/**
+ * @summary Get user permissions
+ */
+export const GetUserPermissionsParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const GetUserPermissionsResponseItem = zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "module": zod.string(),
+  "canView": zod.boolean().optional(),
+  "canCreate": zod.boolean().optional(),
+  "canEdit": zod.boolean().optional(),
+  "canDelete": zod.boolean().optional(),
+  "canApprove": zod.boolean().optional(),
+  "createdAt": zod.string().optional()
+})
+export const GetUserPermissionsResponse = zod.array(GetUserPermissionsResponseItem)
+
+
+/**
+ * @summary Update user permissions
+ */
+export const UpdateUserPermissionParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const UpdateUserPermissionBody = zod.object({
+  "module": zod.string(),
+  "canView": zod.boolean().optional(),
+  "canCreate": zod.boolean().optional(),
+  "canEdit": zod.boolean().optional(),
+  "canDelete": zod.boolean().optional(),
+  "canApprove": zod.boolean().optional()
+})
+
+export const UpdateUserPermissionResponse = zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "module": zod.string(),
+  "canView": zod.boolean().optional(),
+  "canCreate": zod.boolean().optional(),
+  "canEdit": zod.boolean().optional(),
+  "canDelete": zod.boolean().optional(),
+  "canApprove": zod.boolean().optional(),
+  "createdAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Delete a permission
+ */
+export const DeletePermissionParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+

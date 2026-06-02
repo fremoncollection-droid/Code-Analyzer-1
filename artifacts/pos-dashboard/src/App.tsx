@@ -19,6 +19,9 @@ import CashiersPage from "@/pages/cashiers";
 import AuditPage from "@/pages/audit";
 import SalesLogsPage from "@/pages/sales-logs";
 import DisplayPage from "@/pages/display";
+import LeadsPage from "@/pages/leads";
+import SalesManagerPage from "@/pages/sales-manager";
+import PermissionsPage from "@/pages/permissions";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -45,6 +48,9 @@ function AuthenticatedApp() {
         <Route path="/sales-logs" component={SalesLogsPage} />
         <Route path="/settings" component={SettingsPage} />
         <Route path="/display" component={DisplayPage} />
+        <Route path="/leads" component={LeadsPage} />
+        <Route path="/sales-manager" component={SalesManagerPage} />
+        <Route path="/permissions" component={PermissionsPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

@@ -20,7 +20,7 @@ interface AuthContextValue {
   setSelectedLocationId: (id: string) => void;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 function getDevAuth(): { token: string | null; user: AuthUser | null } {
   if (typeof window === "undefined") return { token: null, user: null };

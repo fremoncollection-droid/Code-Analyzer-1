@@ -593,6 +593,118 @@ export interface SalesLog {
   createdAt: string;
 }
 
+export interface Lead {
+  id: string;
+  name: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  email?: string | null;
+  status: string;
+  /** @nullable */
+  source?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  estimatedValue?: string | null;
+  /** @nullable */
+  assignedTo?: string | null;
+  /** @nullable */
+  locationId?: string | null;
+  /** @nullable */
+  lastContactedAt?: string | null;
+  createdAt: string;
+}
+
+export interface LeadInput {
+  name?: string;
+  phone?: string;
+  email?: string;
+  status?: string;
+  source?: string;
+  notes?: string;
+  estimatedValue?: string;
+  assignedTo?: string;
+  locationId?: string;
+}
+
+export interface Task {
+  id: string;
+  userId: string;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  type?: string;
+  dueDate: string;
+  priority?: string;
+  completed?: boolean;
+  /** @nullable */
+  completedAt?: string | null;
+  createdAt: string;
+}
+
+export interface TaskInput {
+  title?: string;
+  description?: string;
+  type?: string;
+  dueDate?: string;
+  priority?: string;
+  userId?: string;
+  completed?: boolean;
+}
+
+export interface DiscountRequest {
+  id: string;
+  /** @nullable */
+  transactionId?: string | null;
+  /** @nullable */
+  customerName?: string | null;
+  /** @nullable */
+  requestedAmount?: string | null;
+  /** @nullable */
+  originalAmount?: string | null;
+  reason: string;
+  status: string;
+  /** @nullable */
+  requestedBy?: string | null;
+  /** @nullable */
+  approvedBy?: string | null;
+  /** @nullable */
+  approvedAt?: string | null;
+  /** @nullable */
+  rejectionReason?: string | null;
+  createdAt: string;
+}
+
+export interface DiscountRequestInput {
+  transactionId?: string;
+  customerName?: string;
+  requestedAmount: string;
+  originalAmount: string;
+  reason: string;
+}
+
+export interface UserPermission {
+  id: string;
+  userId: string;
+  module: string;
+  canView?: boolean;
+  canCreate?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canApprove?: boolean;
+  createdAt?: string;
+}
+
+export interface PermissionInput {
+  module: string;
+  canView?: boolean;
+  canCreate?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canApprove?: boolean;
+}
+
 export type SalesLogInputSalesMode = typeof SalesLogInputSalesMode[keyof typeof SalesLogInputSalesMode];
 
 
@@ -711,4 +823,33 @@ export const ListSalesLogsSalesMode = {
   retail: 'retail',
   wholesale: 'wholesale',
 } as const;
+
+export type ListLeadsParams = {
+status?: string;
+search?: string;
+locationId?: string;
+};
+
+export type GetPipelineSummary200Item = {
+  status?: string;
+  count?: number;
+};
+
+export type ListTasksParams = {
+date?: string;
+completed?: string;
+priority?: string;
+};
+
+export type ListDiscountRequestsParams = {
+status?: string;
+};
+
+export type RejectDiscountRequestBody = {
+  rejectionReason?: string;
+};
+
+export type ListPermissionsParams = {
+userId?: string;
+};
 

@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, ShoppingCart, Package, CreditCard, BarChart2,
   ArrowLeftRight, Calendar, Settings, LogOut, Menu, X, Store, ChevronDown,
-  Users, ShieldCheck, ClipboardList, Building2, ShoppingBag, Monitor
+  Users, ShieldCheck, ClipboardList, Building2, ShoppingBag, Monitor,
+  Target, BarChart3, Shield
 } from "lucide-react";
 import { useListLocations } from "@workspace/api-client-react";
 import {
@@ -24,11 +25,14 @@ const navItems = [
   { path: "/inventory", icon: Package, label: "Inventory" },
   { path: "/transactions", icon: CreditCard, label: "Transactions" },
   { path: "/analytics", icon: BarChart2, label: "Analytics" },
+  { path: "/leads", icon: Target, label: "My Leads" },
+  { path: "/sales-manager", icon: BarChart3, label: "Sales Manager", roles: ["manager", "admin"] },
   { path: "/transfers", icon: ArrowLeftRight, label: "Transfers" },
   { path: "/shifts", icon: Calendar, label: "Shifts" },
   { path: "/cashiers", icon: Users, label: "Cashiers", roles: ["admin", "manager"] },
   { path: "/audit", icon: ShieldCheck, label: "Audit", roles: ["admin", "manager"] },
   { path: "/sales-logs", icon: ClipboardList, label: "Sales Logs", roles: ["admin", "manager"] },
+  { path: "/permissions", icon: Shield, label: "Permissions", roles: ["admin"] },
   { path: "/settings", icon: Settings, label: "Settings" },
   { path: "/display", icon: Monitor, label: "Display", roles: ["admin", "manager"] },
 ];

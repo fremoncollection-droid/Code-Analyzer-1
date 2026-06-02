@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, varchar, boolean, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, varchar, boolean, integer, numeric, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -11,6 +11,7 @@ export const usersTable = pgTable("users", {
   role: varchar("role", { length: 20 }).notNull().default("cashier"),
   customerType: varchar("customer_type", { length: 20 }).default("retail"),
   wholesaleTier: integer("wholesale_tier"),
+  monthlyTarget: numeric("monthly_target", { precision: 12, scale: 2 }),
   taxExempt: boolean("tax_exempt").default(false),
   locationId: uuid("location_id"),
   station: varchar("station", { length: 50 }),

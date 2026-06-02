@@ -89,7 +89,7 @@ router.post("/", authenticateToken, async (req, res) => {
   const body = req.body as {
     name?: string; sku?: string; description?: string; price?: string;
     wholesalePrice1?: string; wholesalePrice2?: string; cost?: string;
-    quantity?: number; minQuantity?: number; locationId?: string; categoryId?: string; unit?: string;
+    quantity?: number; minQuantity?: number; locationId?: string; categoryId?: string; unitId?: string; shelfId?: string; unit?: string;
   };
   if (!body.name || !body.price) {
     res.status(400).json({ error: "name and price required" });
@@ -107,6 +107,8 @@ router.post("/", authenticateToken, async (req, res) => {
     minQuantity: body.minQuantity ?? 0,
     locationId: body.locationId,
     categoryId: body.categoryId,
+    unitId: body.unitId,
+    shelfId: body.shelfId,
     unit: body.unit ?? "piece",
   }).returning();
   res.status(201).json(item);
@@ -115,7 +117,7 @@ router.post("/", authenticateToken, async (req, res) => {
 router.patch("/:id", authenticateToken, async (req, res) => {
   const id = String(req.params.id);
   const body = req.body as Record<string, unknown>;
-  const allowed = ["name", "sku", "description", "price", "wholesalePrice1", "wholesalePrice2", "cost", "quantity", "minQuantity", "locationId", "categoryId", "unit", "isActive"];
+  const allowed = ["name", "sku", "description", "price", "wholesalePrice1", "wholesalePrice2", "cost", "quantity", "minQuantity", "locationId", "categoryId", "unitId", "shelfId", "unit", "isActive"];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) updates[key] = body[key];

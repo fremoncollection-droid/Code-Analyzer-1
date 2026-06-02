@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, usersTable, locationsTable, categoriesTable, inventoryTable } from "@workspace/db";
+import { db, usersTable, locationsTable, categoriesTable, unitsTable, shelvesTable, inventoryTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
@@ -45,14 +45,36 @@ router.post("/", async (_req, res) => {
       set: { passwordHash: await bcrypt.hash("wholesale2", 10), pinHash: await bcrypt.hash("0000", 10), role: "customer", customerType: "wholesale", wholesaleTier: 2, locationId: loc1Id, updatedAt: new Date() }
     });
 
-    // Categories
-    const [catElec] = await db.insert(categoriesTable).values({ name: "Electronics", description: "Electronic devices and accessories" }).returning().onConflictDoNothing() as any;
-    const [catFashion] = await db.insert(categoriesTable).values({ name: "Fashion & Clothing", description: "Apparel and accessories" }).returning().onConflictDoNothing() as any;
-    const [catFood] = await db.insert(categoriesTable).values({ name: "Food & Beverages", description: "Consumables" }).returning().onConflictDoNothing() as any;
-    const [catHome] = await db.insert(categoriesTable).values({ name: "Home & Living", description: "Household items" }).returning().onConflictDoNothing() as any;
+    // Categories with colors
+    await db.insert(categoriesTable).values([
+      { name: "Electronics", color: "#3B82F6", description: "Electronic devices and accessories" },
+      { name: "Fashion & Clothing", color: "#EC4899", description: "Apparel and accessories" },
+      { name: "Food & Beverages", color: "#10B981", description: "Consumables" },
+      { name: "Home & Living", color: "#F59E0B", description: "Household items" },
+    ]).onConflictDoNothing();
 
     const cats = await db.select().from(categoriesTable).limit(4);
     const catIds = cats.map(c => c.id);
+
+    // Units
+    const [unitPiece] = await db.insert(unitsTable).values({ name: "Piece", abbreviation: "pc" }).returning().onConflictDoNothing() as any;
+    const [unitKg] = await db.insert(unitsTable).values({ name: "Kilogram", abbreviation: "kg" }).returning().onConflictDoNothing() as any;
+    const [unitCan] = await db.insert(unitsTable).values({ name: "Can", abbreviation: "can" }).returning().onConflictDoNothing() as any;
+    const [unitBottle] = await db.insert(unitsTable).values({ name: "Bottle", abbreviation: "btl" }).returning().onConflictDoNothing() as any;
+    const [unitBag] = await db.insert(unitsTable).values({ name: "Bag", abbreviation: "bag" }).returning().onConflictDoNothing() as any;
+
+    const allUnits = await db.select().from(unitsTable).limit(5);
+    const unitIds = allUnits.map(u => u.id);
+
+    // Shelves
+    const [shelfA1] = await db.insert(shelvesTable).values({ name: "A1", zone: "Front Display", capacity: 50 }).returning().onConflictDoNothing() as any;
+    const [shelfA2] = await db.insert(shelvesTable).values({ name: "A2", zone: "Front Display", capacity: 50 }).returning().onConflictDoNothing() as any;
+    const [shelfB1] = await db.insert(shelvesTable).values({ name: "B1", zone: "Back Storage", capacity: 100 }).returning().onConflictDoNothing() as any;
+    const [shelfB2] = await db.insert(shelvesTable).values({ name: "B2", zone: "Back Storage", capacity: 100 }).returning().onConflictDoNothing() as any;
+    const [shelfC1] = await db.insert(shelvesTable).values({ name: "C1", zone: "Electronics", capacity: 30 }).returning().onConflictDoNothing() as any;
+
+    const allShelves = await db.select().from(shelvesTable).limit(5);
+    const shelfIds = allShelves.map(s => s.id);
 
     // Inventory
     if (loc1Id) {

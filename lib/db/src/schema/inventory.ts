@@ -3,6 +3,8 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { locationsTable } from "./locations";
 import { categoriesTable } from "./categories";
+import { unitsTable } from "./units";
+import { shelvesTable } from "./shelves";
 
 export const inventoryTable = pgTable("inventory", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -17,6 +19,8 @@ export const inventoryTable = pgTable("inventory", {
   minQuantity: integer("min_quantity").notNull().default(0),
   locationId: uuid("location_id").references(() => locationsTable.id),
   categoryId: uuid("category_id").references(() => categoriesTable.id),
+  unitId: uuid("unit_id").references(() => unitsTable.id),
+  shelfId: uuid("shelf_id").references(() => shelvesTable.id),
   unit: varchar("unit", { length: 30 }).default("piece"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

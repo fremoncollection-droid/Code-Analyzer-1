@@ -1,0 +1,31 @@
+Act as an expert full-stack developer. Build a complete, production-ready feature to Manage and Customize Categories, Units, and Shelves using React, Tailwind CSS, Express 5, and Node.js. 
+
+Generate modular code, including the Express database models, API routes, and React components, ensuring they fit seamlessly into a standard Replit workspace.
+
+### 1. Database & Models (Express 5 / Node.js)
+Define schemas/models for Categories, Units, and Shelves with these relationships:
+* **Categories**: id, name (string), color (hex string, default: '#3B82F6').
+* **Units**: id, name (string, e.g., Kilograms), abbreviation (string, e.g., kg).
+* **Shelves**: id, name (string/number), zone (string), capacity (integer).
+* **Products Relationship**: Ensure your product schema links to these tables using 'category_id', 'unit_id', and 'shelf_id' as foreign keys.
+
+### 2. Backend REST API Endpoints (Express 5)
+Create three separate router files (categories.js, units.js, shelves.js) with standard CRUD operations:
+* **POST `/api/`**: Validate that the 'name' field is present and unique.
+* **GET `/api/`**: Fetch all records sorted alphabetically by name.
+* **PUT `/api/:id`**: Update existing records by ID.
+* **DELETE `/api/:id`**: Add a relational safety check. If any product is currently linked to this 'id', block the deletion and return a 400 status code with a message: "Cannot delete. Items are currently assigned to this resource."
+
+### 3. Frontend UI Components (React + Tailwind CSS)
+Build an organized, responsive dashboard page (`/settings` or `/management`) with the following UI architecture:
+* **Tabbed Interface**: A navigation bar to switch smoothly between "Categories", "Units", and "Shelves" views.
+* **State Management**: Use React hooks (useState, useEffect) to manage data fetching and local UI updates efficiently without reloading the page.
+* **Interactive Forms & Modals**: 
+  - Implementation of "Add New" and "Edit" modals using Tailwind CSS transitions.
+  - Include an `<input type="color">` color picker specifically for custom category badges.
+* **Data Presentation**: 
+  - Clean Tailwind tables showing all entries with distinct "Edit" and "Delete" icons/buttons.
+  - Display the category name inside a colored pill/badge using its saved hex code.
+* **Feedback System**: Toast notifications or alert banners using Tailwind classes to show success (green) or deletion block errors (red).
+
+Please output clean, modular code. Include the backend route files, the main Express app integration, and the frontend React components complete with Tailwind utility classes.

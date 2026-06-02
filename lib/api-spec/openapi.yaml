@@ -352,6 +352,201 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Category"
+  /categories/{id}:
+    put:
+      operationId: updateCategory
+      tags: [categories]
+      summary: Update a category
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+    delete:
+      operationId: deleteCategory
+      tags: [categories]
+      summary: Delete a category
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /units:
+    get:
+      operationId: listUnits
+      tags: [units]
+      summary: List all units
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of units
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Unit"
+    post:
+      operationId: createUnit
+      tags: [units]
+      summary: Create a unit
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnitInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Unit"
+  /units/{id}:
+    put:
+      operationId: updateUnit
+      tags: [units]
+      summary: Update a unit
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnitInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Unit"
+    delete:
+      operationId: deleteUnit
+      tags: [units]
+      summary: Delete a unit
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /shelves:
+    get:
+      operationId: listShelves
+      tags: [shelves]
+      summary: List all shelves
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of shelves
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Shelf"
+    post:
+      operationId: createShelf
+      tags: [shelves]
+      summary: Create a shelf
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShelfInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shelf"
+  /shelves/{id}:
+    put:
+      operationId: updateShelf
+      tags: [shelves]
+      summary: Update a shelf
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShelfInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shelf"
+    delete:
+      operationId: deleteShelf
+      tags: [shelves]
+      summary: Delete a shelf
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
 
   /transactions:
     get:
@@ -1244,12 +1439,15 @@ components:
 
     Category:
       type: object
-      required: [id, name]
+      required: [id, name, color]
       properties:
         id:
           type: string
         name:
           type: string
+        color:
+          type: string
+          default: "#3B82F6"
         description:
           type: ["string", "null"]
         createdAt:
@@ -1260,6 +1458,8 @@ components:
       required: [name]
       properties:
         name:
+          type: string
+        color:
           type: string
         description:
           type: string
@@ -1296,6 +1496,10 @@ components:
           type: ["string", "null"]
         unit:
           type: ["string", "null"]
+        unitId:
+          type: ["string", "null"]
+        shelfId:
+          type: ["string", "null"]
         isActive:
           type: boolean
         createdAt:
@@ -1326,6 +1530,10 @@ components:
         locationId:
           type: string
         categoryId:
+          type: string
+        unitId:
+          type: string
+        shelfId:
           type: string
         unit:
           type: string
@@ -1939,6 +2147,54 @@ components:
           type: object
         approvedBy:
           type: string
+
+    Unit:
+      type: object
+      required: [id, name, abbreviation]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        abbreviation:
+          type: string
+        createdAt:
+          type: string
+
+    UnitInput:
+      type: object
+      required: [name, abbreviation]
+      properties:
+        name:
+          type: string
+        abbreviation:
+          type: string
+
+    Shelf:
+      type: object
+      required: [id, name, zone, capacity]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        zone:
+          type: string
+        capacity:
+          type: integer
+        createdAt:
+          type: string
+
+    ShelfInput:
+      type: object
+      required: [name, zone]
+      properties:
+        name:
+          type: string
+        zone:
+          type: string
+        capacity:
+          type: integer
 
     SalesLog:
       type: object

@@ -186,6 +186,8 @@ export const ListInventoryResponseItem = zod.object({
   "categoryId": zod.string().nullish(),
   "categoryName": zod.string().nullish(),
   "unit": zod.string().nullish(),
+  "unitId": zod.string().nullish(),
+  "shelfId": zod.string().nullish(),
   "isActive": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
@@ -207,6 +209,8 @@ export const CreateInventoryItemBody = zod.object({
   "minQuantity": zod.number().optional(),
   "locationId": zod.string().optional(),
   "categoryId": zod.string().optional(),
+  "unitId": zod.string().optional(),
+  "shelfId": zod.string().optional(),
   "unit": zod.string().optional()
 })
 
@@ -233,6 +237,8 @@ export const GetInventoryItemResponse = zod.object({
   "categoryId": zod.string().nullish(),
   "categoryName": zod.string().nullish(),
   "unit": zod.string().nullish(),
+  "unitId": zod.string().nullish(),
+  "shelfId": zod.string().nullish(),
   "isActive": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
@@ -276,6 +282,8 @@ export const UpdateInventoryItemResponse = zod.object({
   "categoryId": zod.string().nullish(),
   "categoryName": zod.string().nullish(),
   "unit": zod.string().nullish(),
+  "unitId": zod.string().nullish(),
+  "shelfId": zod.string().nullish(),
   "isActive": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
@@ -292,9 +300,12 @@ export const DeleteInventoryItemParams = zod.object({
 /**
  * @summary List all categories
  */
+export const listCategoriesResponseColorDefault = `#3B82F6`;
+
 export const ListCategoriesResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
+  "color": zod.string().default(listCategoriesResponseColorDefault),
   "description": zod.string().nullish(),
   "createdAt": zod.string().optional()
 })
@@ -306,7 +317,142 @@ export const ListCategoriesResponse = zod.array(ListCategoriesResponseItem)
  */
 export const CreateCategoryBody = zod.object({
   "name": zod.string(),
+  "color": zod.string().optional(),
   "description": zod.string().optional()
+})
+
+
+/**
+ * @summary Update a category
+ */
+export const UpdateCategoryParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateCategoryBody = zod.object({
+  "name": zod.string(),
+  "color": zod.string().optional(),
+  "description": zod.string().optional()
+})
+
+export const updateCategoryResponseColorDefault = `#3B82F6`;
+
+export const UpdateCategoryResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "color": zod.string().default(updateCategoryResponseColorDefault),
+  "description": zod.string().nullish(),
+  "createdAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Delete a category
+ */
+export const DeleteCategoryParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+/**
+ * @summary List all units
+ */
+export const ListUnitsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "abbreviation": zod.string(),
+  "createdAt": zod.string().optional()
+})
+export const ListUnitsResponse = zod.array(ListUnitsResponseItem)
+
+
+/**
+ * @summary Create a unit
+ */
+export const CreateUnitBody = zod.object({
+  "name": zod.string(),
+  "abbreviation": zod.string()
+})
+
+
+/**
+ * @summary Update a unit
+ */
+export const UpdateUnitParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateUnitBody = zod.object({
+  "name": zod.string(),
+  "abbreviation": zod.string()
+})
+
+export const UpdateUnitResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "abbreviation": zod.string(),
+  "createdAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Delete a unit
+ */
+export const DeleteUnitParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+/**
+ * @summary List all shelves
+ */
+export const ListShelvesResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "zone": zod.string(),
+  "capacity": zod.number(),
+  "createdAt": zod.string().optional()
+})
+export const ListShelvesResponse = zod.array(ListShelvesResponseItem)
+
+
+/**
+ * @summary Create a shelf
+ */
+export const CreateShelfBody = zod.object({
+  "name": zod.string(),
+  "zone": zod.string(),
+  "capacity": zod.number().optional()
+})
+
+
+/**
+ * @summary Update a shelf
+ */
+export const UpdateShelfParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateShelfBody = zod.object({
+  "name": zod.string(),
+  "zone": zod.string(),
+  "capacity": zod.number().optional()
+})
+
+export const UpdateShelfResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "zone": zod.string(),
+  "capacity": zod.number(),
+  "createdAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Delete a shelf
+ */
+export const DeleteShelfParams = zod.object({
+  "id": zod.coerce.string()
 })
 
 

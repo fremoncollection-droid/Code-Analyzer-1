@@ -55,6 +55,7 @@ export interface LocationInput {
 export interface Category {
   id: string;
   name: string;
+  color: string;
   /** @nullable */
   description?: string | null;
   createdAt?: string;
@@ -62,6 +63,7 @@ export interface Category {
 
 export interface CategoryInput {
   name: string;
+  color?: string;
   description?: string;
 }
 
@@ -89,6 +91,10 @@ export interface InventoryItem {
   categoryName?: string | null;
   /** @nullable */
   unit?: string | null;
+  /** @nullable */
+  unitId?: string | null;
+  /** @nullable */
+  shelfId?: string | null;
   isActive?: boolean;
   createdAt?: string;
 }
@@ -105,6 +111,8 @@ export interface InventoryInput {
   minQuantity?: number;
   locationId?: string;
   categoryId?: string;
+  unitId?: string;
+  shelfId?: string;
   unit?: string;
 }
 
@@ -519,6 +527,32 @@ export interface AuditLogInput {
   oldValues?: AuditLogInputOldValues;
   newValues?: AuditLogInputNewValues;
   approvedBy?: string;
+}
+
+export interface Unit {
+  id: string;
+  name: string;
+  abbreviation: string;
+  createdAt?: string;
+}
+
+export interface UnitInput {
+  name: string;
+  abbreviation: string;
+}
+
+export interface Shelf {
+  id: string;
+  name: string;
+  zone: string;
+  capacity: number;
+  createdAt?: string;
+}
+
+export interface ShelfInput {
+  name: string;
+  zone: string;
+  capacity?: number;
 }
 
 export type SalesLogSalesMode = typeof SalesLogSalesMode[keyof typeof SalesLogSalesMode];

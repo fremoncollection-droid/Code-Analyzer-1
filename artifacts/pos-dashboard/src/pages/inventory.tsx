@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListInventory, useListCategories, useListLocations, useCreateInventoryItem, useUpdateInventoryItem, useDeleteInventoryItem } from "@workspace/api-client-react";
+import { useListInventory, useListCategories, useListLocations, useListUnits, useListShelves, useCreateInventoryItem, useUpdateInventoryItem, useDeleteInventoryItem } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +20,18 @@ export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState<any | null>(null);
-  const [form, setForm] = useState({ name: "", sku: "", price: "", cost: "", quantity: "0", minQuantity: "5", categoryId: "", unit: "piece" });
+  const [form, setForm] = useState({
+    name: "",
+    sku: "",
+    price: "",
+    cost: "",
+    quantity: "0",
+    minQuantity: "5",
+    categoryId: "",
+    unitId: "",
+    shelfId: "",
+    unit: "piece",
+  });
 
   const { data: inventory, isLoading } = useListInventory({
     locationId: selectedLocationId ?? undefined,
@@ -28,22 +39,35 @@ export default function InventoryPage() {
   });
   const { data: categories } = useListCategories();
   const { data: locations } = useListLocations();
+  const { data: units } = useListUnits();
+  const { data: shelves } = useListShelves();
 
   const createItem = useCreateInventoryItem({ mutation: { onSuccess: () => { invalidate(); closeDialog(); toast({ title: "Item created" }); } } });
   const updateItem = useUpdateInventoryItem({ mutation: { onSuccess: () => { invalidate(); closeDialog(); toast({ title: "Item updated" }); } } });
-  const deleteItem = useDeleteInventoryItem({ mutation: { onSuccess: () => { invalidate(); toast({ title: "Item deleted" }); } } });
+  const deleteItem = useDeleteInventoryItem({ mutation: { onSuccess: () => { invalidate(); closeDialog(); toast({ title: "Item deleted" }); } } });
 
   function invalidate() { qc.invalidateQueries({ queryKey: ["/api/inventory"] }); }
 
   function openCreate() {
     setEditItem(null);
-    setForm({ name: "", sku: "", price: "", cost: "", quantity: "0", minQuantity: "5", categoryId: "", unit: "piece" });
+    setForm({ name: "", sku: "", price: "", cost: "", quantity: "0", minQuantity: "5", categoryId: "", unitId: "", shelfId: "", unit: "piece" });
     setDialogOpen(true);
   }
 
   function openEdit(item: any) {
     setEditItem(item);
-    setForm({ name: item.name, sku: item.sku ?? "", price: item.price, cost: item.cost ?? "", quantity: String(item.quantity), minQuantity: String(item.minQuantity), categoryId: item.categoryId ?? "", unit: item.unit ?? "piece" });
+    setForm({
+      name: item.name,
+      sku: item.sku ?? "",
+      price: item.price,
+      cost: item.cost ?? "",
+      quantity: String(item.quantity),
+      minQuantity: String(item.minQuantity),
+      categoryId: item.categoryId ?? "",
+      unitId: item.unitId ?? "",
+      shelfId: item.shelfId ?? "",
+      unit: item.unit ?? "piece",
+    });
     setDialogOpen(true);
   }
 
@@ -58,6 +82,8 @@ export default function InventoryPage() {
       quantity: parseInt(form.quantity),
       minQuantity: parseInt(form.minQuantity),
       categoryId: form.categoryId || undefined,
+      unitId: form.unitId || undefined,
+      shelfId: form.shelfId || undefined,
       unit: form.unit,
       locationId: selectedLocationId ?? undefined,
     };
@@ -127,6 +153,7 @@ export default function InventoryPage() {
                       <div>
                         <p className="font-medium">{item.name}</p>
                         {item.sku && <p className="text-xs text-muted-foreground">{item.sku}</p>}
+                        {item.unitName && <p className="text-xs text-muted-foreground">{item.unitName}</p>}
                       </div>
                     </div>
                   </td>
@@ -174,12 +201,10 @@ export default function InventoryPage() {
             </div>
             <div className="space-y-1">
               <Label>Unit</Label>
-              <Select value={form.unit} onValueChange={v => setForm(f => ({ ...f, unit: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select value={form.unitId} onValueChange={v => setForm(f => ({ ...f, unitId: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
                 <SelectContent>
-                  {["piece", "kg", "g", "litre", "ml", "bag", "box", "can", "bottle", "carton"].map(u => (
-                    <SelectItem key={u} value={u}>{u}</SelectItem>
-                  ))}
+                  {units?.map(u => <SelectItem key={u.id} value={u.id}>{u.name} ({u.abbreviation})</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -199,12 +224,21 @@ export default function InventoryPage() {
               <Label>Min Stock Alert</Label>
               <Input type="number" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} />
             </div>
-            <div className="col-span-2 space-y-1">
+            <div className="space-y-1">
               <Label>Category</Label>
               <Select value={form.categoryId} onValueChange={v => setForm(f => ({ ...f, categoryId: v }))}>
                 <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
                   {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Shelf</Label>
+              <Select value={form.shelfId} onValueChange={v => setForm(f => ({ ...f, shelfId: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select shelf" /></SelectTrigger>
+                <SelectContent>
+                  {shelves?.map(s => <SelectItem key={s.id} value={s.id}>{s.name} ({s.zone})</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

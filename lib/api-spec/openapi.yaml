@@ -1498,7 +1498,15 @@ components:
           type: ["string", "null"]
         unitId:
           type: ["string", "null"]
+        unitName:
+          type: ["string", "null"]
+        unitAbbreviation:
+          type: ["string", "null"]
         shelfId:
+          type: ["string", "null"]
+        shelfName:
+          type: ["string", "null"]
+        shelfZone:
           type: ["string", "null"]
         isActive:
           type: boolean

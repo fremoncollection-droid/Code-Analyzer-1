@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, inventoryTable, categoriesTable } from "@workspace/db";
+import { db, inventoryTable, categoriesTable, unitsTable, shelvesTable } from "@workspace/db";
 import { eq, and, ilike, lte, sql } from "drizzle-orm";
 import { authenticateToken } from "../middleware/auth";
 
@@ -40,12 +40,20 @@ router.get("/", authenticateToken, async (req, res) => {
       locationId: inventoryTable.locationId,
       categoryId: inventoryTable.categoryId,
       categoryName: categoriesTable.name,
+      unitId: inventoryTable.unitId,
+      unitName: unitsTable.name,
+      unitAbbreviation: unitsTable.abbreviation,
+      shelfId: inventoryTable.shelfId,
+      shelfName: shelvesTable.name,
+      shelfZone: shelvesTable.zone,
       unit: inventoryTable.unit,
       isActive: inventoryTable.isActive,
       createdAt: inventoryTable.createdAt,
     })
     .from(inventoryTable)
     .leftJoin(categoriesTable, eq(inventoryTable.categoryId, categoriesTable.id))
+    .leftJoin(unitsTable, eq(inventoryTable.unitId, unitsTable.id))
+    .leftJoin(shelvesTable, eq(inventoryTable.shelfId, shelvesTable.id))
     .where(and(...conditions))
     .orderBy(inventoryTable.name);
 

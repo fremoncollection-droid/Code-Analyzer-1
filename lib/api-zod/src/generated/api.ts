@@ -187,7 +187,11 @@ export const ListInventoryResponseItem = zod.object({
   "categoryName": zod.string().nullish(),
   "unit": zod.string().nullish(),
   "unitId": zod.string().nullish(),
+  "unitName": zod.string().nullish(),
+  "unitAbbreviation": zod.string().nullish(),
   "shelfId": zod.string().nullish(),
+  "shelfName": zod.string().nullish(),
+  "shelfZone": zod.string().nullish(),
   "isActive": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
@@ -238,7 +242,11 @@ export const GetInventoryItemResponse = zod.object({
   "categoryName": zod.string().nullish(),
   "unit": zod.string().nullish(),
   "unitId": zod.string().nullish(),
+  "unitName": zod.string().nullish(),
+  "unitAbbreviation": zod.string().nullish(),
   "shelfId": zod.string().nullish(),
+  "shelfName": zod.string().nullish(),
+  "shelfZone": zod.string().nullish(),
   "isActive": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })
@@ -283,7 +291,11 @@ export const UpdateInventoryItemResponse = zod.object({
   "categoryName": zod.string().nullish(),
   "unit": zod.string().nullish(),
   "unitId": zod.string().nullish(),
+  "unitName": zod.string().nullish(),
+  "unitAbbreviation": zod.string().nullish(),
   "shelfId": zod.string().nullish(),
+  "shelfName": zod.string().nullish(),
+  "shelfZone": zod.string().nullish(),
   "isActive": zod.boolean().optional(),
   "createdAt": zod.string().optional()
 })

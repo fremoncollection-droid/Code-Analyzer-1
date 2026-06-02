@@ -94,7 +94,15 @@ export interface InventoryItem {
   /** @nullable */
   unitId?: string | null;
   /** @nullable */
+  unitName?: string | null;
+  /** @nullable */
+  unitAbbreviation?: string | null;
+  /** @nullable */
   shelfId?: string | null;
+  /** @nullable */
+  shelfName?: string | null;
+  /** @nullable */
+  shelfZone?: string | null;
   isActive?: boolean;
   createdAt?: string;
 }

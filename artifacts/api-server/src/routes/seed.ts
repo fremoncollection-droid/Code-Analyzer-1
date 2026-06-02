@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, usersTable, locationsTable, categoriesTable, unitsTable, shelvesTable, inventoryTable } from "@workspace/db";
+import { db, usersTable, locationsTable, categoriesTable, shelvesTable, inventoryTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
@@ -55,16 +55,6 @@ router.post("/", async (_req, res) => {
 
     const cats = await db.select().from(categoriesTable).limit(4);
     const catIds = cats.map(c => c.id);
-
-    // Units
-    const [unitPiece] = await db.insert(unitsTable).values({ name: "Piece", abbreviation: "pc" }).returning().onConflictDoNothing() as any;
-    const [unitKg] = await db.insert(unitsTable).values({ name: "Kilogram", abbreviation: "kg" }).returning().onConflictDoNothing() as any;
-    const [unitCan] = await db.insert(unitsTable).values({ name: "Can", abbreviation: "can" }).returning().onConflictDoNothing() as any;
-    const [unitBottle] = await db.insert(unitsTable).values({ name: "Bottle", abbreviation: "btl" }).returning().onConflictDoNothing() as any;
-    const [unitBag] = await db.insert(unitsTable).values({ name: "Bag", abbreviation: "bag" }).returning().onConflictDoNothing() as any;
-
-    const allUnits = await db.select().from(unitsTable).limit(5);
-    const unitIds = allUnits.map(u => u.id);
 
     // Shelves
     const [shelfA1] = await db.insert(shelvesTable).values({ name: "A1", zone: "Front Display", capacity: 50 }).returning().onConflictDoNothing() as any;

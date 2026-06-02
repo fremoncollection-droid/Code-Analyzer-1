@@ -1,9 +1,10 @@
 import { useGetAnalyticsSummary, useGetSalesByDay, useGetTopItems, useListLocations } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
+import { useSalesMode } from "@/lib/sales-mode";
 import { formatCurrency, formatShortDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, ShoppingBag, CreditCard, AlertTriangle, Banknote, Smartphone, BarChart3 } from "lucide-react";
+import { TrendingUp, ShoppingBag, CreditCard, AlertTriangle, Banknote, Smartphone, BarChart3, ShoppingBag as RetailIcon, Building2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
@@ -56,10 +57,18 @@ export default function DashboardPage() {
     },
   ];
 
-  const paymentBreakdown = summary ? [
-    { label: "Cash", value: parseFloat(summary.cashSales ?? "0"), icon: Banknote, color: "bg-teal-500" },
-    { label: "MoMo", value: parseFloat(summary.momoSales ?? "0"), icon: Smartphone, color: "bg-yellow-500" },
-    { label: "Card", value: parseFloat(summary.cardSales ?? "0"), icon: CreditCard, color: "bg-blue-500" },
+  const s = summary as any;
+  const modeBreakdown = s ? [
+    { label: "Retail", value: parseFloat(s.retailSales ?? "0"), icon: RetailIcon, color: "bg-emerald-500", textColor: "text-emerald-600" },
+    { label: "Wholesale", value: parseFloat(s.wholesaleSales ?? "0"), icon: Building2, color: "bg-blue-600", textColor: "text-blue-600" },
+  ] : [];
+
+  const paymentBreakdown = s ? [
+    { label: "Cash", value: parseFloat(s.cashSales ?? "0"), icon: Banknote, color: "bg-teal-500" },
+    { label: "MoMo", value: parseFloat(s.momoSales ?? "0"), icon: Smartphone, color: "bg-yellow-500" },
+    { label: "Card", value: parseFloat(s.cardSales ?? "0"), icon: CreditCard, color: "bg-blue-500" },
+    { label: "Net 30", value: parseFloat(s.net30Sales ?? "0"), icon: CreditCard, color: "bg-indigo-500" },
+    { label: "PO", value: parseFloat(s.poSales ?? "0"), icon: ShoppingBag, color: "bg-purple-500" },
   ] : [];
 
   const total = paymentBreakdown.reduce((s, p) => s + p.value, 0);
@@ -128,6 +137,35 @@ export default function DashboardPage() {
               <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
                 No sales data yet
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Mode split */}
+        <Card className="border-card-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Sales by Mode</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {modeBreakdown.map(p => (
+              <div key={p.label}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className={`flex items-center gap-2 font-medium ${p.textColor}`}>
+                    <p.icon className="w-3 h-3" />
+                    {p.label}
+                  </span>
+                  <span className="font-medium">{formatCurrency(p.value)}</span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full">
+                  <div
+                    className={`h-full rounded-full ${p.color}`}
+                    style={{ width: total > 0 ? `${(p.value / total) * 100}%` : "0%" }}
+                  />
+                </div>
+              </div>
+            ))}
+            {modeBreakdown.length === 0 && (
+              <p className="text-muted-foreground text-sm text-center py-4">No sales yet</p>
             )}
           </CardContent>
         </Card>

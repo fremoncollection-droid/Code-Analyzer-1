@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useListInventory, useListCategories, useListLocations, useCreateTransaction, useInitiateMoMo, useGetMoMoStatus, useGetSettings, useGetActiveShift, useOpenShift } from "@workspace/api-client-react";
+import { useListInventory, useListCategories, useListLocations, useCreateTransaction, useInitiateMoMo, useGetMoMoStatus, useGetSettings, useGetActiveShift, useOpenShift, useListUsers, useCreateSalesLog } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
+import { useSalesMode } from "@/lib/sales-mode";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, Smartphone,
   Wifi, WifiOff, CheckCircle2, X, ScanBarcode, ChevronUp,
-  Package, Send, Clock
+  Package, Send, Clock, Building2, ShoppingBag
 } from "lucide-react";
 import ReceiptModal from "@/components/receipt-modal";
 
@@ -71,6 +72,7 @@ function saveOfflineQueue(q: any[]) {
 
 export default function POSPage() {
   const { user, selectedLocationId } = useAuth();
+  const { salesMode, isWholesale } = useSalesMode();
   const { toast } = useToast();
   const qc = useQueryClient();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -82,7 +84,7 @@ export default function POSPage() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "momo" | "card">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "momo" | "card" | "net30" | "purchase_order">("cash");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [momoPhone, setMomoPhone] = useState("");
   const [momoNetwork, setMomoNetwork] = useState<"MTN" | "Telecel">("MTN");
@@ -93,6 +95,8 @@ export default function POSPage() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [customerSearch, setCustomerSearch] = useState("");
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [showScannerHint, setShowScannerHint] = useState(false);
   const [quickScan, setQuickScan] = useState(false);
@@ -110,6 +114,10 @@ export default function POSPage() {
   });
   const { data: locations } = useListLocations();
   const { data: settings } = useGetSettings();
+  const { data: allUsers } = useListUsers();
+  // Wholesale customers (users with customerType = 'wholesale')
+  const wholesaleCustomers = allUsers?.filter((u: any) => u.customerType === "wholesale") ?? [];
+  const selectedCustomer = wholesaleCustomers.find((c: any) => c.id === selectedCustomerId);
   // Active shift
   const { data: activeShift } = useGetActiveShift(user?.id ?? "", {
     query: { enabled: !!user?.id } as any,
@@ -135,6 +143,12 @@ export default function POSPage() {
     },
   });
 
+  const createSalesLog = useCreateSalesLog({
+    mutation: {
+      onError: () => {},
+    },
+  });
+
   const createTx = useCreateTransaction({
     mutation: {
       onSuccess: (tx) => {
@@ -145,6 +159,16 @@ export default function POSPage() {
         setReceiptOpen(true);
         toast({ title: "Sale recorded", description: `Receipt: ${tx.receiptNumber}` });
         qc.invalidateQueries({ queryKey: ["/api/analytics"] });
+        // Log the sale
+        createSalesLog.mutate({
+          data: {
+            action: "sale",
+            salesMode: (tx.salesMode ?? "retail") as any,
+            orderId: tx.id,
+            details: `Receipt ${tx.receiptNumber} via ${tx.paymentMethod}`,
+            total: tx.total,
+          } as any,
+        });
       },
       onError: (err: any) => {
         if (!navigator.onLine) queueOffline();
@@ -167,6 +191,19 @@ export default function POSPage() {
     query: { enabled: !!momoRef, refetchInterval: 2000 } as any,
   });
 
+  // --- Mode switching: clear cart when mode changes ---
+  const prevModeRef = useRef(salesMode);
+  useEffect(() => {
+    if (prevModeRef.current !== salesMode) {
+      setCart([]);
+      setPaymentMethod("cash");
+      setSelectedCustomerId(null);
+      setCustomerName("");
+      setCustomerPhone("");
+      prevModeRef.current = salesMode;
+    }
+  }, [salesMode]);
+
   // --- Computed ---
   const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
   const taxRates = getTaxRates(settings as any);
@@ -174,6 +211,16 @@ export default function POSPage() {
   const taxAmount = taxBreakdown.totalTax;
   const total = subtotal + taxAmount;
   const momoConfirmed = momoStatus?.status === "successful";
+
+  // Get wholesale tier price for an item
+  function getItemPrice(item: any): number {
+    if (isWholesale && item.wholesalePrice1) {
+      const tier = (selectedCustomer as any)?.wholesaleTier ?? 1;
+      if (tier === 2 && item.wholesalePrice2) return parseFloat(item.wholesalePrice2);
+      return parseFloat(item.wholesalePrice1);
+    }
+    return parseFloat(item.price);
+  }
 
   // --- Barcode / search scanner ---
   const handleSearch = useCallback((val: string) => {
@@ -336,6 +383,9 @@ export default function POSPage() {
       },
       total: total.toFixed(2),
       paymentMethod,
+      salesMode,
+      wholesaleTier: isWholesale ? ((selectedCustomer as any)?.wholesaleTier ?? 1) : undefined,
+      customerId: selectedCustomerId ?? undefined,
       momoPhone: paymentMethod === "momo" ? momoPhone : undefined,
       momoNetwork: paymentMethod === "momo" ? momoNetwork : undefined,
       momoReference: momoRef ?? undefined,
@@ -345,12 +395,13 @@ export default function POSPage() {
   }
 
   function addToCart(item: any) {
+    const price = getItemPrice(item);
     setCart(prev => {
       const existing = prev.find(c => c.itemId === item.id);
       if (existing) {
         return prev.map(c => c.itemId === item.id ? { ...c, quantity: c.quantity + 1 } : c);
       }
-      return [...prev, { itemId: item.id, name: item.name, price: parseFloat(item.price), quantity: 1, unit: item.unit ?? "piece", sku: item.sku }];
+      return [...prev, { itemId: item.id, name: item.name, price, quantity: 1, unit: item.unit ?? "piece", sku: item.sku }];
     });
   }
 
@@ -518,7 +569,16 @@ export default function POSPage() {
                       <Package className="w-6 h-6 text-muted-foreground" />
                     </div>
                     <p className="font-medium text-xs lg:text-sm leading-tight line-clamp-2">{item.name}</p>
-                    <p className="text-primary font-semibold text-sm lg:text-base mt-1">{formatCurrency(item.price)}</p>
+                    <p className={cn("font-semibold text-sm lg:text-base mt-1", isWholesale ? "text-blue-600" : "text-primary")}>
+                      {isWholesale ? (
+                        <>
+                          {formatCurrency(getItemPrice(item))}
+                          {item.price && <span className="text-[10px] text-muted-foreground line-through ml-1">{formatCurrency(item.price)}</span>}
+                        </>
+                      ) : (
+                        formatCurrency(item.price)
+                      )}
+                    </p>
                     <p className="text-muted-foreground text-[10px] mt-0.5">
                       {outOfStock ? "Out of stock" : `${item.quantity} ${item.unit ?? "pcs"} left`}
                     </p>
@@ -545,7 +605,7 @@ export default function POSPage() {
         <div className="shrink-0 flex items-center justify-between p-4 border-b border-border">
           <h2 className="font-bold text-base flex items-center gap-2">
             <ShoppingCart className="w-4 h-4" />
-            Cart
+            {isWholesale ? "Wholesale Cart" : "Cart"}
             {cartItems > 0 && <Badge variant="secondary" className="text-xs">{cartItemCount} items</Badge>}
           </h2>
           {cartItems > 0 && (
@@ -554,6 +614,57 @@ export default function POSPage() {
             </button>
           )}
         </div>
+
+        {/* Wholesale customer selector */}
+        {isWholesale && (
+          <div className="shrink-0 px-4 py-3 border-b border-border bg-blue-50/50">
+            <Label className="text-xs text-blue-700 flex items-center gap-1 mb-1.5">
+              <Building2 className="w-3 h-3" /> Business Customer
+              <span className="text-destructive">*</span>
+            </Label>
+            <div className="relative">
+              <Input
+                value={customerSearch}
+                onChange={e => setCustomerSearch(e.target.value)}
+                placeholder="Search customer name..."
+                className="h-8 text-sm pr-8"
+              />
+              {customerSearch && (
+                <button onClick={() => setCustomerSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+            {customerSearch && (
+              <div className="mt-1 border border-border rounded-md bg-background max-h-28 overflow-y-auto">
+                {wholesaleCustomers.filter((c: any) => c.username?.toLowerCase().includes(customerSearch.toLowerCase()) || c.email?.toLowerCase().includes(customerSearch.toLowerCase())).length === 0 ? (
+                  <p className="px-2 py-1.5 text-xs text-muted-foreground">No customers found</p>
+                ) : (
+                  wholesaleCustomers.filter((c: any) => c.username?.toLowerCase().includes(customerSearch.toLowerCase()) || c.email?.toLowerCase().includes(customerSearch.toLowerCase())).map((c: any) => (
+                    <button
+                      key={c.id}
+                      onClick={() => { setSelectedCustomerId(c.id); setCustomerSearch(""); }}
+                      className="w-full text-left px-2 py-1.5 text-xs hover:bg-muted flex items-center justify-between"
+                    >
+                      <span>{c.username}</span>
+                      <Badge variant="outline" className="text-[10px]">Tier {c.wholesaleTier ?? 1}</Badge>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+            {selectedCustomer && (
+              <div className="mt-1.5 flex items-center gap-1.5 text-xs text-blue-700">
+                <CheckCircle2 className="w-3 h-3" />
+                <span className="font-medium">{selectedCustomer.username}</span>
+                <Badge variant="outline" className="text-[10px]">Tier {(selectedCustomer as any).wholesaleTier ?? 1}</Badge>
+                <button onClick={() => setSelectedCustomerId(null)} className="text-muted-foreground hover:text-destructive ml-auto">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Cart items */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -627,30 +738,39 @@ export default function POSPage() {
           </div>
 
           {/* Payment method */}
-          <div className="grid grid-cols-3 gap-2">
-            {([
-              { key: "cash", icon: Banknote, label: "Cash" },
-              { key: "momo", icon: Smartphone, label: "MoMo" },
-              { key: "card", icon: CreditCard, label: "Card" },
-            ] as const).map(({ key, icon: Icon, label }) => (
-              <button
-                key={key}
-                onClick={() => setPaymentMethod(key)}
-                className={cn(
-                  "flex flex-col items-center gap-1 py-2.5 rounded-lg border text-xs font-medium transition-colors min-h-[48px]",
-                  paymentMethod === key ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
-                )}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-              </button>
-            ))}
+          <div className={cn("grid gap-2", isWholesale ? "grid-cols-3" : "grid-cols-3")}>
+            {(() => {
+              const methods = isWholesale ? [
+                { key: "net30" as const, icon: CreditCard, label: "Net 30" },
+                { key: "purchase_order" as const, icon: ShoppingBag, label: "Purchase Order" },
+                { key: "cash" as const, icon: Banknote, label: "Cash" },
+              ] : [
+                { key: "cash" as const, icon: Banknote, label: "Cash" },
+                { key: "momo" as const, icon: Smartphone, label: "MoMo" },
+                { key: "card" as const, icon: CreditCard, label: "Card" },
+              ];
+              return methods.map(({ key, icon: Icon, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setPaymentMethod(key)}
+                  className={cn(
+                    "flex flex-col items-center gap-1 py-2.5 rounded-lg border text-xs font-medium transition-colors min-h-[48px]",
+                    paymentMethod === key
+                      ? isWholesale ? "border-blue-600 bg-blue-50 text-blue-600" : "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/40"
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </button>
+              ));
+            })()}
           </div>
 
           {/* Pay / F12 */}
           <Button
-            className="w-full h-12 text-base font-bold gap-2"
-            disabled={cartItems === 0 || createTx.isPending}
+            className={cn("w-full h-12 text-base font-bold gap-2", isWholesale && "bg-blue-600 hover:bg-blue-700")}
+            disabled={cartItems === 0 || createTx.isPending || (isWholesale && !selectedCustomerId)}
             onClick={() => setCheckoutOpen(true)}
           >
             {createTx.isPending ? "Processing..." : (
@@ -661,6 +781,9 @@ export default function POSPage() {
               </>
             )}
           </Button>
+          {isWholesale && !selectedCustomerId && (
+            <p className="text-xs text-destructive text-center">Select a business customer to proceed</p>
+          )}
         </div>
       </div>
 
@@ -741,20 +864,27 @@ export default function POSPage() {
               {taxBreakdown.covid > 0 && <div className="flex justify-between text-muted-foreground"><span>COVID</span><span className="tabular-nums">{formatCurrency(taxBreakdown.covid)}</span></div>}
               <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-primary tabular-nums">{formatCurrency(total)}</span></div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {([
-                { key: "cash", icon: Banknote, label: "Cash" },
-                { key: "momo", icon: Smartphone, label: "MoMo" },
-                { key: "card", icon: CreditCard, label: "Card" },
-              ] as const).map(({ key, icon: Icon, label }) => (
-                <button key={key} onClick={() => setPaymentMethod(key)} className={cn("flex flex-col items-center gap-1 py-2 rounded-lg border text-xs font-medium min-h-[48px]", paymentMethod === key ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground")}>
+            <div className={cn("grid gap-2", isWholesale ? "grid-cols-3" : "grid-cols-3")}>
+              {(isWholesale ? [
+                { key: "net30" as const, icon: CreditCard, label: "Net 30" },
+                { key: "purchase_order" as const, icon: ShoppingBag, label: "PO" },
+                { key: "cash" as const, icon: Banknote, label: "Cash" },
+              ] : [
+                { key: "cash" as const, icon: Banknote, label: "Cash" },
+                { key: "momo" as const, icon: Smartphone, label: "MoMo" },
+                { key: "card" as const, icon: CreditCard, label: "Card" },
+              ]).map(({ key, icon: Icon, label }) => (
+                <button key={key} onClick={() => setPaymentMethod(key)} className={cn("flex flex-col items-center gap-1 py-2 rounded-lg border text-xs font-medium min-h-[48px]", paymentMethod === key ? (isWholesale ? "border-blue-600 bg-blue-50 text-blue-600" : "border-primary bg-primary/10 text-primary") : "border-border text-muted-foreground")}>
                   <Icon className="w-4 h-4" />{label}
                 </button>
               ))}
             </div>
-            <Button className="w-full h-12 text-base font-bold gap-2" disabled={cartItems === 0 || createTx.isPending} onClick={() => { setMobileCartOpen(false); setCheckoutOpen(true); }}>
+            <Button className={cn("w-full h-12 text-base font-bold gap-2", isWholesale && "bg-blue-600 hover:bg-blue-700")} disabled={cartItems === 0 || createTx.isPending || (isWholesale && !selectedCustomerId)} onClick={() => { setMobileCartOpen(false); setCheckoutOpen(true); }}>
               {createTx.isPending ? "Processing..." : <><span>Pay</span><span className="tabular-nums">{formatCurrency(total)}</span></>}
             </Button>
+            {isWholesale && !selectedCustomerId && (
+              <p className="text-xs text-destructive text-center">Select a business customer</p>
+            )}
           </div>
         </div>
       </div>
@@ -782,16 +912,33 @@ export default function POSPage() {
             </div>
 
             {/* Customer */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Customer Name</Label>
-                <Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Name" className="h-8 text-sm" />
+            {isWholesale ? (
+              <div className="space-y-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <Label className="text-xs text-blue-700 flex items-center gap-1">
+                  <Building2 className="w-3 h-3" /> Business Customer
+                </Label>
+                {selectedCustomer ? (
+                  <div className="flex items-center gap-1.5 text-sm text-blue-800">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span className="font-medium">{selectedCustomer.username}</span>
+                    <Badge variant="outline" className="text-[10px]">Tier {(selectedCustomer as any).wholesaleTier ?? 1}</Badge>
+                  </div>
+                ) : (
+                  <p className="text-sm text-destructive">No customer selected — required for wholesale</p>
+                )}
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Customer Phone</Label>
-                <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="+233..." className="h-8 text-sm" />
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Customer Name</Label>
+                  <Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Name" className="h-8 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Customer Phone</Label>
+                  <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="+233..." className="h-8 text-sm" />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* MoMo Panel */}
             {paymentMethod === "momo" && (
@@ -838,11 +985,21 @@ export default function POSPage() {
                 <div className="flex items-center gap-2"><CreditCard className="w-4 h-4" /> Process card payment for <strong className="tabular-nums">{formatCurrency(total)}</strong></div>
               </div>
             )}
+            {paymentMethod === "net30" && (
+              <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-200 text-sm text-indigo-700">
+                <div className="flex items-center gap-2"><CreditCard className="w-4 h-4" /> Net 30 terms — invoice due in 30 days: <strong className="tabular-nums">{formatCurrency(total)}</strong></div>
+              </div>
+            )}
+            {paymentMethod === "purchase_order" && (
+              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200 text-sm text-purple-700">
+                <div className="flex items-center gap-2"><ShoppingBag className="w-4 h-4" /> Purchase Order — customer billed on account: <strong className="tabular-nums">{formatCurrency(total)}</strong></div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => { setCheckoutOpen(false); setMomoRef(null); }}>Cancel</Button>
-            <Button onClick={handleCheckout} disabled={createTx.isPending || (paymentMethod === "momo" && !momoConfirmed)}>
+            <Button className={cn(isWholesale && "bg-blue-600 hover:bg-blue-700")} onClick={handleCheckout} disabled={createTx.isPending || (paymentMethod === "momo" && !momoConfirmed) || (isWholesale && !selectedCustomerId)}>
               {createTx.isPending ? "Processing..." : "Complete Sale"}
             </Button>
           </DialogFooter>

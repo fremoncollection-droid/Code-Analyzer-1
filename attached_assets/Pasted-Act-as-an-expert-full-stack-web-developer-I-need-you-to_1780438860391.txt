@@ -1,0 +1,31 @@
+Act as an expert full-stack web developer. I need you to build a dual-mode Storefront/POS web application in this Replit workspace that allows a salesperson to handle both Retail and Wholesale sales from a single interface. 
+
+The core requirement is that these two modes must be strictly separated using a global toggle switch. Any sales, logs, history, and financial totals must stay completely isolated based on the active mode.
+
+Please implement the following architecture and features:
+
+1. GLOBAL TOGGLE INTERFACE
+- Place a prominent toggle switch or tab bar at the very top of the sales dashboard: "Retail Mode" and "Wholesale Mode".
+- When "Retail Mode" is active, change the UI accent colors to Green. The customer search should be optional (for individual walk-ins), pricing must reflect standard retail MSRP, and checkout options should be Cash or Card.
+- When "Wholesale Mode" is active, change the UI accent colors to Blue. The interface must require a Company/Business Customer Profile to be linked, pricing must automatically drop to bulk/tiered pricing, and checkout options must include corporate terms like "Net 30" or "Purchase Order (PO)".
+
+2. RECONCILIATION & SEPARATED DASHBOARD METRICS
+- On the dashboard, show two distinct, real-time running financial totals for the day: [Daily Retail Total] and [Daily Wholesale Total]. These metrics must never mix.
+
+3. DATABASE ARCHITECTURE
+Create a relational database (SQLite/PostgreSQL) with the following fields to ensure strict data separation via a `sales_mode` column:
+- `Products`: Include fields for product_id, sku, name, retail_price, wholesale_tier_1_price, wholesale_tier_2_price, and stock_qty.
+- `Customers`: Include customer_id, name, customer_type ('Retail' or 'Wholesale'), wholesale_tier, and tax_exempt_status.
+- `Orders`: Crucial table. Must include a `sales_mode` column (ENUM or VARCHAR: 'Retail' or 'Wholesale') alongside order_id, salesperson_id, customer_id, subtotal, tax_amount, total_amount, payment_method, and created_at.
+- `Order_Items`: Include order_item_id, order_id, product_id, quantity, and unit_price_applied.
+- `Sales_Logs`: Track actions with a `sales_mode` column ('Retail' or 'Wholesale'), log_id, salesperson_id, action_performed, and timestamp.
+
+4. SEPARATED LOGS AND HISTORY WORKFLOW
+- When the salesperson views "Order History", only display past orders matching the CURRENTly active toggle mode (e.g., if Wholesale is active, run a query filtering where `sales_mode = 'Wholesale'`).
+- Any actions taken by the sales agent (adding items, applying discounts, checking out) must append a log row to the `Sales_Logs` table stamped with the active `sales_mode`.
+
+5. CODE REQUIRMENTS
+- Build this using a clean layout (e.g., React with Tailwind CSS for frontend, Node.js/Express for the backend). 
+- Ensure that switching the global toggle instantly updates the frontend state without reloading the entire web page, clearing the current cart context securely so retail and wholesale items never mix in a single transaction.
+
+Please generate the backend routes, database schema/migration files, and the reactive frontend layout now.

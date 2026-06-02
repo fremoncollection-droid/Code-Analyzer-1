@@ -56,6 +56,10 @@ router.get("/summary", authenticateToken, async (req, res) => {
       cashSales: sql<string>`COALESCE(SUM(CASE WHEN ${transactionsTable.paymentMethod} = 'cash' THEN ${transactionsTable.total} ELSE 0 END), 0)`,
       momoSales: sql<string>`COALESCE(SUM(CASE WHEN ${transactionsTable.paymentMethod} = 'momo' THEN ${transactionsTable.total} ELSE 0 END), 0)`,
       cardSales: sql<string>`COALESCE(SUM(CASE WHEN ${transactionsTable.paymentMethod} = 'card' THEN ${transactionsTable.total} ELSE 0 END), 0)`,
+      net30Sales: sql<string>`COALESCE(SUM(CASE WHEN ${transactionsTable.paymentMethod} = 'net30' THEN ${transactionsTable.total} ELSE 0 END), 0)`,
+      poSales: sql<string>`COALESCE(SUM(CASE WHEN ${transactionsTable.paymentMethod} = 'purchase_order' THEN ${transactionsTable.total} ELSE 0 END), 0)`,
+      retailSales: sql<string>`COALESCE(SUM(CASE WHEN ${transactionsTable.salesMode} = 'retail' THEN ${transactionsTable.total} ELSE 0 END), 0)`,
+      wholesaleSales: sql<string>`COALESCE(SUM(CASE WHEN ${transactionsTable.salesMode} = 'wholesale' THEN ${transactionsTable.total} ELSE 0 END), 0)`,
     })
     .from(transactionsTable)
     .where(and(...conditions));
@@ -81,6 +85,10 @@ router.get("/summary", authenticateToken, async (req, res) => {
     cashSales: parseFloat(summary.cashSales ?? "0").toFixed(2),
     momoSales: parseFloat(summary.momoSales ?? "0").toFixed(2),
     cardSales: parseFloat(summary.cardSales ?? "0").toFixed(2),
+    net30Sales: parseFloat(summary.net30Sales ?? "0").toFixed(2),
+    poSales: parseFloat(summary.poSales ?? "0").toFixed(2),
+    retailSales: parseFloat(summary.retailSales ?? "0").toFixed(2),
+    wholesaleSales: parseFloat(summary.wholesaleSales ?? "0").toFixed(2),
     lowStockItems: lowStockItems ?? 0,
   });
 });

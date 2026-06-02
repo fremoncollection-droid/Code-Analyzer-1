@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useListTransactions, useVoidTransaction } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,14 +11,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { Receipt, Banknote, Smartphone, CreditCard, XCircle, Eye } from "lucide-react";
+import { Receipt, Banknote, Smartphone, CreditCard, XCircle, Eye, Building2, ShoppingBag } from "lucide-react";
+import { useSalesMode } from "@/lib/sales-mode";
 import ReceiptModal from "@/components/receipt-modal";
 import ManagerOverrideModal from "@/components/manager-override-modal";
 
-const PAYMENT_ICONS: Record<string, any> = { cash: Banknote, momo: Smartphone, card: CreditCard };
+const PAYMENT_ICONS: Record<string, any> = { cash: Banknote, momo: Smartphone, card: CreditCard, net30: CreditCard, purchase_order: ShoppingBag };
+const MODE_ICONS: Record<string, any> = { retail: ShoppingBag, wholesale: Building2 };
+const MODE_COLORS: Record<string, string> = { retail: "bg-emerald-50 text-emerald-700", wholesale: "bg-blue-50 text-blue-700" };
 
 export default function TransactionsPage() {
   const { user, selectedLocationId } = useAuth();
+  const { salesMode, isRetail } = useSalesMode();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [paymentFilter, setPaymentFilter] = useState("all");
@@ -31,6 +35,7 @@ export default function TransactionsPage() {
   const { data, isLoading } = useListTransactions({
     locationId: selectedLocationId ?? undefined,
     paymentMethod: paymentFilter !== "all" ? paymentFilter : undefined,
+    salesMode,
     limit: 100,
   });
 
@@ -69,19 +74,28 @@ export default function TransactionsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Transactions</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{data?.total ?? 0} total</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-muted-foreground text-sm">{data?.total ?? 0} total</p>
+            <Badge className={cn("text-[10px]", isRetail ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700")}>
+              {isRetail ? "Retail" : "Wholesale"}
+            </Badge>
+          </div>
         </div>
-        <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-          <SelectTrigger className="w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Methods</SelectItem>
-            <SelectItem value="cash">Cash</SelectItem>
-            <SelectItem value="momo">MoMo</SelectItem>
-            <SelectItem value="card">Card</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Methods</SelectItem>
+              <SelectItem value="cash">Cash</SelectItem>
+              <SelectItem value="momo">MoMo</SelectItem>
+              <SelectItem value="card">Card</SelectItem>
+              <SelectItem value="net30">Net 30</SelectItem>
+              <SelectItem value="purchase_order">Purchase Order</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Card className="border-card-border">
@@ -90,6 +104,7 @@ export default function TransactionsPage() {
             <thead>
               <tr className="border-b border-border">
                 <th className="text-left px-4 py-3 text-muted-foreground font-medium">Receipt</th>
+                <th className="text-left px-4 py-3 text-muted-foreground font-medium">Mode</th>
                 <th className="text-left px-4 py-3 text-muted-foreground font-medium">Date</th>
                 <th className="text-left px-4 py-3 text-muted-foreground font-medium">Cashier</th>
                 <th className="text-left px-4 py-3 text-muted-foreground font-medium">Payment</th>
@@ -102,11 +117,12 @@ export default function TransactionsPage() {
               {isLoading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i} className="border-b border-border">
-                    <td colSpan={7} className="px-4 py-3"><div className="h-4 bg-muted rounded animate-pulse" /></td>
+                    <td colSpan={8} className="px-4 py-3"><div className="h-4 bg-muted rounded animate-pulse" /></td>
                   </tr>
                 ))
               ) : transactions.map(tx => {
-                const Icon = PAYMENT_ICONS[tx.paymentMethod] ?? Banknote;
+                const Icon = PAYMENT_ICONS[tx.paymentMethod as string] ?? Banknote;
+                const ModeIcon = MODE_ICONS[tx.salesMode as string] ?? ShoppingBag;
                 return (
                   <tr key={tx.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs">
@@ -114,6 +130,12 @@ export default function TransactionsPage() {
                         <Receipt className="w-3 h-3 text-muted-foreground" />
                         {tx.receiptNumber}
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge className={cn("text-[10px]", MODE_COLORS[tx.salesMode as string] ?? "bg-muted")}>
+                        <ModeIcon className="w-2.5 h-2.5 mr-0.5" />
+                        {tx.salesMode ?? "retail"}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">{formatDate(tx.createdAt)}</td>
                     <td className="px-4 py-3 text-sm">{tx.cashierName ?? "—"}</td>

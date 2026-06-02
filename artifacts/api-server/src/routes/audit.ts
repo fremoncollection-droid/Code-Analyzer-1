@@ -27,6 +27,7 @@ router.get("/", authenticateToken, authorize("admin", "manager"), async (req, re
       newValues: auditLogTable.newValues,
       ipAddress: auditLogTable.ipAddress,
       userAgent: auditLogTable.userAgent,
+      salesMode: auditLogTable.salesMode,
       createdAt: auditLogTable.createdAt,
     })
     .from(auditLogTable)
@@ -58,6 +59,7 @@ router.post("/", authenticateToken, async (req, res) => {
     oldValues?: any;
     newValues?: any;
     approvedBy?: string;
+    salesMode?: string;
   };
 
   if (!body.action) {
@@ -78,6 +80,7 @@ router.post("/", authenticateToken, async (req, res) => {
     approvedBy: body.approvedBy ?? null,
     ipAddress: ip ?? null,
     userAgent: userAgent ?? null,
+    salesMode: body.salesMode ?? null,
   }).returning();
 
   res.status(201).json(log);

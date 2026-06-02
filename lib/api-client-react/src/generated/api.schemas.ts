@@ -75,6 +75,10 @@ export interface InventoryItem {
   price: string;
   /** @nullable */
   cost?: string | null;
+  /** @nullable */
+  wholesalePrice1?: string | null;
+  /** @nullable */
+  wholesalePrice2?: string | null;
   quantity: number;
   minQuantity?: number;
   /** @nullable */
@@ -94,6 +98,8 @@ export interface InventoryInput {
   sku?: string;
   description?: string;
   price: string;
+  wholesalePrice1?: string;
+  wholesalePrice2?: string;
   cost?: string;
   quantity?: number;
   minQuantity?: number;
@@ -107,6 +113,8 @@ export interface InventoryUpdate {
   sku?: string;
   description?: string;
   price?: string;
+  wholesalePrice1?: string;
+  wholesalePrice2?: string;
   cost?: string;
   quantity?: number;
   minQuantity?: number;
@@ -133,6 +141,16 @@ export const TransactionInputPaymentMethod = {
   cash: 'cash',
   momo: 'momo',
   card: 'card',
+  net30: 'net30',
+  purchase_order: 'purchase_order',
+} as const;
+
+export type TransactionInputSalesMode = typeof TransactionInputSalesMode[keyof typeof TransactionInputSalesMode];
+
+
+export const TransactionInputSalesMode = {
+  retail: 'retail',
+  wholesale: 'wholesale',
 } as const;
 
 export interface TransactionInput {
@@ -147,6 +165,11 @@ export interface TransactionInput {
   momoPhone?: string;
   momoNetwork?: string;
   momoReference?: string;
+  salesMode?: TransactionInputSalesMode;
+  /** @nullable */
+  wholesaleTier?: number | null;
+  /** @nullable */
+  customerId?: string | null;
   customerName?: string;
   customerPhone?: string;
   notes?: string;
@@ -183,6 +206,12 @@ export interface Transaction {
   isVoided?: boolean;
   /** @nullable */
   voidReason?: string | null;
+  /** @nullable */
+  salesMode?: string | null;
+  /** @nullable */
+  wholesaleTier?: number | null;
+  /** @nullable */
+  customerId?: string | null;
   createdAt: string;
 }
 
@@ -473,6 +502,8 @@ export interface AuditLog {
   ipAddress?: string | null;
   /** @nullable */
   userAgent?: string | null;
+  /** @nullable */
+  salesMode?: string | null;
   createdAt: string;
 }
 
@@ -490,6 +521,55 @@ export interface AuditLogInput {
   approvedBy?: string;
 }
 
+export type SalesLogSalesMode = typeof SalesLogSalesMode[keyof typeof SalesLogSalesMode];
+
+
+export const SalesLogSalesMode = {
+  retail: 'retail',
+  wholesale: 'wholesale',
+} as const;
+
+export interface SalesLog {
+  id: string;
+  salespersonId?: string;
+  /** @nullable */
+  salespersonName?: string | null;
+  salesMode?: SalesLogSalesMode;
+  action: string;
+  /** @nullable */
+  details?: string | null;
+  /** @nullable */
+  productId?: string | null;
+  /** @nullable */
+  orderId?: string | null;
+  /** @nullable */
+  quantity?: number | null;
+  /** @nullable */
+  unitPrice?: string | null;
+  /** @nullable */
+  total?: string | null;
+  createdAt: string;
+}
+
+export type SalesLogInputSalesMode = typeof SalesLogInputSalesMode[keyof typeof SalesLogInputSalesMode];
+
+
+export const SalesLogInputSalesMode = {
+  retail: 'retail',
+  wholesale: 'wholesale',
+} as const;
+
+export interface SalesLogInput {
+  action: string;
+  details?: string;
+  productId?: string;
+  orderId?: string;
+  quantity?: number;
+  unitPrice?: string;
+  total?: string;
+  salesMode?: SalesLogInputSalesMode;
+}
+
 export type ListInventoryParams = {
 locationId?: string;
 categoryId?: string;
@@ -502,9 +582,18 @@ locationId?: string;
 startDate?: string;
 endDate?: string;
 paymentMethod?: string;
+salesMode?: ListTransactionsSalesMode;
 limit?: number;
 offset?: number;
 };
+
+export type ListTransactionsSalesMode = typeof ListTransactionsSalesMode[keyof typeof ListTransactionsSalesMode];
+
+
+export const ListTransactionsSalesMode = {
+  retail: 'retail',
+  wholesale: 'wholesale',
+} as const;
 
 export type ListShiftsParams = {
 locationId?: string;
@@ -562,4 +651,22 @@ export type MomoWebhookBody = {
   amount?: string;
   phone?: string;
 };
+
+export type ListSalesLogsParams = {
+salespersonId?: string;
+salesMode?: ListSalesLogsSalesMode;
+action?: string;
+startDate?: string;
+endDate?: string;
+limit?: number;
+offset?: number;
+};
+
+export type ListSalesLogsSalesMode = typeof ListSalesLogsSalesMode[keyof typeof ListSalesLogsSalesMode];
+
+
+export const ListSalesLogsSalesMode = {
+  retail: 'retail',
+  wholesale: 'wholesale',
+} as const;
 

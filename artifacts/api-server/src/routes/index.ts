@@ -13,6 +13,7 @@ import seedRouter from "./seed";
 import settingsRouter from "./settings";
 import auditRouter from "./audit";
 import usersRouter from "./users";
+import salesLogsRouter from "./sales-logs";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use("/seed", seedRouter);
 router.use("/settings", settingsRouter);
 router.use("/audit", auditRouter);
 router.use("/users", usersRouter);
+router.use("/sales-logs", salesLogsRouter);
 
 export default router;

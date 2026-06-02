@@ -10,6 +10,8 @@ export const inventoryTable = pgTable("inventory", {
   sku: varchar("sku", { length: 100 }).unique(),
   description: text("description"),
   price: numeric("price", { precision: 12, scale: 2 }).notNull(),
+  wholesalePrice1: numeric("wholesale_price_1", { precision: 12, scale: 2 }),
+  wholesalePrice2: numeric("wholesale_price_2", { precision: 12, scale: 2 }),
   cost: numeric("cost", { precision: 12, scale: 2 }),
   quantity: integer("quantity").notNull().default(0),
   minQuantity: integer("min_quantity").notNull().default(0),

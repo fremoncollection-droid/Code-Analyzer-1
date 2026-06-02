@@ -36,6 +36,7 @@ import type {
   InventoryUpdate,
   ListAuditLogsParams,
   ListInventoryParams,
+  ListSalesLogsParams,
   ListShiftsParams,
   ListTransactionsParams,
   ListTransfersParams,
@@ -53,6 +54,8 @@ import type {
   Receipt,
   RefreshInput,
   SalesByDay,
+  SalesLog,
+  SalesLogInput,
   SettingsMap,
   Shift,
   ShiftCloseResult,
@@ -3679,5 +3682,160 @@ export const useMomoWebhook = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getMomoWebhookMutationOptions(options));
+    }
+
+export const getListSalesLogsUrl = (params?: ListSalesLogsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/sales-logs?${stringifiedParams}` : `/api/sales-logs`
+}
+
+/**
+ * @summary List sales logs
+ */
+export const listSalesLogs = async (params?: ListSalesLogsParams, options?: RequestInit): Promise<SalesLog[]> => {
+
+  return customFetch<SalesLog[]>(getListSalesLogsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSalesLogsQueryKey = (params?: ListSalesLogsParams,) => {
+    return [
+    `/api/sales-logs`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSalesLogsQueryOptions = <TData = Awaited<ReturnType<typeof listSalesLogs>>, TError = ErrorType<unknown>>(params?: ListSalesLogsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSalesLogs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSalesLogsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSalesLogs>>> = ({ signal }) => listSalesLogs(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSalesLogs>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSalesLogsQueryResult = NonNullable<Awaited<ReturnType<typeof listSalesLogs>>>
+export type ListSalesLogsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List sales logs
+ */
+
+export function useListSalesLogs<TData = Awaited<ReturnType<typeof listSalesLogs>>, TError = ErrorType<unknown>>(
+ params?: ListSalesLogsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSalesLogs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSalesLogsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateSalesLogUrl = () => {
+
+
+
+
+  return `/api/sales-logs`
+}
+
+/**
+ * @summary Create sales log entry
+ */
+export const createSalesLog = async (salesLogInput: SalesLogInput, options?: RequestInit): Promise<SalesLog> => {
+
+  return customFetch<SalesLog>(getCreateSalesLogUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      salesLogInput,)
+  }
+);}
+
+
+
+
+export const getCreateSalesLogMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSalesLog>>, TError,{data: BodyType<SalesLogInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSalesLog>>, TError,{data: BodyType<SalesLogInput>}, TContext> => {
+
+const mutationKey = ['createSalesLog'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSalesLog>>, {data: BodyType<SalesLogInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createSalesLog(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSalesLogMutationResult = NonNullable<Awaited<ReturnType<typeof createSalesLog>>>
+    export type CreateSalesLogMutationBody = BodyType<SalesLogInput>
+    export type CreateSalesLogMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create sales log entry
+ */
+export const useCreateSalesLog = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSalesLog>>, TError,{data: BodyType<SalesLogInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSalesLog>>,
+        TError,
+        {data: BodyType<SalesLogInput>},
+        TContext
+      > => {
+      return useMutation(getCreateSalesLogMutationOptions(options));
     }
 

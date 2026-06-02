@@ -7,3 +7,4 @@ export * from "./shifts";
 export * from "./transfers";
 export * from "./audit";
 export * from "./settings";
+export * from "./sales_logs";

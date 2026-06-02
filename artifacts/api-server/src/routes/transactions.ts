@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, transactionsTable, inventoryTable, locationsTable, usersTable, auditLogTable } from "@workspace/db";
+import { db, transactionsTable, inventoryTable, locationsTable, usersTable, auditLogTable, salesLogsTable } from "@workspace/db";
 import { eq, and, gte, lte, desc, count, sql } from "drizzle-orm";
 import { authenticateToken } from "../middleware/auth";
 import { nanoid } from "nanoid";
@@ -54,7 +54,7 @@ router.post("/sync", authenticateToken, async (req, res) => {
 });
 
 router.get("/", authenticateToken, async (req, res) => {
-  const { locationId, startDate, endDate, paymentMethod, limit = "50", offset = "0" } = req.query as Record<string, string>;
+  const { locationId, startDate, endDate, paymentMethod, salesMode, limit = "50", offset = "0" } = req.query as Record<string, string>;
   const user = (req as any).user;
 
   let effectiveLocationId = locationId;
@@ -67,6 +67,7 @@ router.get("/", authenticateToken, async (req, res) => {
   if (startDate) conditions.push(gte(transactionsTable.createdAt, new Date(startDate)));
   if (endDate) conditions.push(lte(transactionsTable.createdAt, new Date(endDate)));
   if (paymentMethod) conditions.push(eq(transactionsTable.paymentMethod, paymentMethod));
+  if (salesMode) conditions.push(eq(transactionsTable.salesMode, salesMode));
 
   const [{ total }] = await db
     .select({ total: count() })
@@ -84,12 +85,16 @@ router.get("/", authenticateToken, async (req, res) => {
       items: transactionsTable.items,
       subtotal: transactionsTable.subtotal,
       taxAmount: transactionsTable.taxAmount,
+      taxBreakdown: transactionsTable.taxBreakdown,
       total: transactionsTable.total,
       paymentMethod: transactionsTable.paymentMethod,
       paymentStatus: transactionsTable.paymentStatus,
       momoPhone: transactionsTable.momoPhone,
       momoNetwork: transactionsTable.momoNetwork,
       momoReference: transactionsTable.momoReference,
+      salesMode: transactionsTable.salesMode,
+      wholesaleTier: transactionsTable.wholesaleTier,
+      customerId: transactionsTable.customerId,
       customerName: transactionsTable.customerName,
       customerPhone: transactionsTable.customerPhone,
       notes: transactionsTable.notes,
@@ -112,8 +117,8 @@ router.post("/", authenticateToken, async (req, res) => {
   const body = req.body as {
     locationId?: string; items?: any[]; subtotal?: string; taxAmount?: string;
     taxBreakdown?: any; total?: string; paymentMethod?: string; momoPhone?: string; momoNetwork?: string;
-    momoReference?: string; customerName?: string; customerPhone?: string; notes?: string;
-    shiftId?: string;
+    momoReference?: string; customerId?: string; customerName?: string; customerPhone?: string; notes?: string;
+    shiftId?: string; salesMode?: string; wholesaleTier?: number;
   };
 
   if (!body.locationId || !body.items || !body.subtotal || !body.total || !body.paymentMethod) {
@@ -123,6 +128,7 @@ router.post("/", authenticateToken, async (req, res) => {
 
   const receiptNumber = generateReceiptNumber();
   const cashierId = (req as any).user.id;
+  const salesMode = body.salesMode === "wholesale" ? "wholesale" : "retail";
 
   const [tx] = await db.insert(transactionsTable).values({
     receiptNumber,
@@ -136,6 +142,9 @@ router.post("/", authenticateToken, async (req, res) => {
     total: body.total,
     paymentMethod: body.paymentMethod,
     paymentStatus: body.paymentMethod === "momo" ? "pending" : "completed",
+    salesMode,
+    wholesaleTier: body.wholesaleTier ?? null,
+    customerId: body.customerId ?? null,
     momoPhone: body.momoPhone,
     momoNetwork: body.momoNetwork,
     momoReference: body.momoReference,
@@ -152,6 +161,21 @@ router.post("/", authenticateToken, async (req, res) => {
         WHERE id = ${item.itemId}
       `);
     }
+  }
+
+  // Log to sales_logs
+  for (const item of body.items) {
+    await db.insert(salesLogsTable).values({
+      salespersonId: cashierId,
+      salesMode,
+      action: "sale_item",
+      details: `Sold ${item.quantity} x ${item.name}`,
+      productId: item.itemId,
+      orderId: tx.id,
+      quantity: item.quantity,
+      unitPrice: item.price,
+      total: item.total,
+    });
   }
 
   res.status(201).json(tx);

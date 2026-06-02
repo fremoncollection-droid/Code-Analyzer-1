@@ -377,6 +377,11 @@ paths:
           in: query
           schema:
             type: string
+        - name: salesMode
+          in: query
+          schema:
+            type: string
+            enum: [retail, wholesale]
         - name: limit
           in: query
           schema:
@@ -1083,6 +1088,72 @@ paths:
         "200":
           description: Webhook processed
 
+  /sales-logs:
+    get:
+      operationId: listSalesLogs
+      tags: [sales-logs]
+      summary: List sales logs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: salespersonId
+          in: query
+          schema:
+            type: string
+        - name: salesMode
+          in: query
+          schema:
+            type: string
+            enum: [retail, wholesale]
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sales logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SalesLog"
+    post:
+      operationId: createSalesLog
+      tags: [sales-logs]
+      summary: Create sales log entry
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SalesLogInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesLog"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1209,6 +1280,10 @@ components:
           type: string
         cost:
           type: ["string", "null"]
+        wholesalePrice1:
+          type: ["string", "null"]
+        wholesalePrice2:
+          type: ["string", "null"]
         quantity:
           type: integer
         minQuantity:
@@ -1238,6 +1313,10 @@ components:
           type: string
         price:
           type: string
+        wholesalePrice1:
+          type: string
+        wholesalePrice2:
+          type: string
         cost:
           type: string
         quantity:
@@ -1261,6 +1340,10 @@ components:
         description:
           type: string
         price:
+          type: string
+        wholesalePrice1:
+          type: string
+        wholesalePrice2:
           type: string
         cost:
           type: string
@@ -1314,13 +1397,20 @@ components:
           type: string
         paymentMethod:
           type: string
-          enum: [cash, momo, card]
+          enum: [cash, momo, card, net30, purchase_order]
         momoPhone:
           type: string
         momoNetwork:
           type: string
         momoReference:
           type: string
+        salesMode:
+          type: string
+          enum: [retail, wholesale]
+        wholesaleTier:
+          type: [integer, "null"]
+        customerId:
+          type: [string, "null"]
         customerName:
           type: string
         customerPhone:
@@ -1373,6 +1463,12 @@ components:
         isVoided:
           type: boolean
         voidReason:
+          type: ["string", "null"]
+        salesMode:
+          type: ["string", "null"]
+        wholesaleTier:
+          type: ["integer", "null"]
+        customerId:
           type: ["string", "null"]
         createdAt:
           type: string
@@ -1820,6 +1916,8 @@ components:
           type: ["string", "null"]
         userAgent:
           type: ["string", "null"]
+        salesMode:
+          type: ["string", "null"]
         createdAt:
           type: string
 
@@ -1841,3 +1939,55 @@ components:
           type: object
         approvedBy:
           type: string
+
+    SalesLog:
+      type: object
+      required: [id, action, createdAt]
+      properties:
+        id:
+          type: string
+        salespersonId:
+          type: string
+        salespersonName:
+          type: ["string", "null"]
+        salesMode:
+          type: string
+          enum: [retail, wholesale]
+        action:
+          type: string
+        details:
+          type: ["string", "null"]
+        productId:
+          type: ["string", "null"]
+        orderId:
+          type: ["string", "null"]
+        quantity:
+          type: ["number", "null"]
+        unitPrice:
+          type: ["string", "null"]
+        total:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    SalesLogInput:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+        details:
+          type: string
+        productId:
+          type: string
+        orderId:
+          type: string
+        quantity:
+          type: number
+        unitPrice:
+          type: string
+        total:
+          type: string
+        salesMode:
+          type: string
+          enum: [retail, wholesale]

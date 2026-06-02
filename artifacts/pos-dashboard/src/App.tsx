@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { SalesModeProvider } from "@/lib/sales-mode";
 import Layout from "@/components/layout";
 import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
@@ -15,6 +16,7 @@ import ShiftsPage from "@/pages/shifts";
 import SettingsPage from "@/pages/settings";
 import CashiersPage from "@/pages/cashiers";
 import AuditPage from "@/pages/audit";
+import SalesLogsPage from "@/pages/sales-logs";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -38,6 +40,7 @@ function AuthenticatedApp() {
         <Route path="/shifts" component={ShiftsPage} />
         <Route path="/cashiers" component={CashiersPage} />
         <Route path="/audit" component={AuditPage} />
+        <Route path="/sales-logs" component={SalesLogsPage} />
         <Route path="/settings" component={SettingsPage} />
         <Route component={NotFound} />
       </Switch>
@@ -50,10 +53,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <AuthenticatedApp />
-          </WouterRouter>
-          <Toaster />
+          <SalesModeProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <AuthenticatedApp />
+            </WouterRouter>
+            <Toaster />
+          </SalesModeProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

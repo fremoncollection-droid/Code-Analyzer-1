@@ -32,6 +32,8 @@ router.get("/", authenticateToken, async (req, res) => {
       sku: inventoryTable.sku,
       description: inventoryTable.description,
       price: inventoryTable.price,
+      wholesalePrice1: inventoryTable.wholesalePrice1,
+      wholesalePrice2: inventoryTable.wholesalePrice2,
       cost: inventoryTable.cost,
       quantity: inventoryTable.quantity,
       minQuantity: inventoryTable.minQuantity,
@@ -59,6 +61,8 @@ router.get("/:id", authenticateToken, async (req, res) => {
       sku: inventoryTable.sku,
       description: inventoryTable.description,
       price: inventoryTable.price,
+      wholesalePrice1: inventoryTable.wholesalePrice1,
+      wholesalePrice2: inventoryTable.wholesalePrice2,
       cost: inventoryTable.cost,
       quantity: inventoryTable.quantity,
       minQuantity: inventoryTable.minQuantity,
@@ -83,7 +87,8 @@ router.get("/:id", authenticateToken, async (req, res) => {
 
 router.post("/", authenticateToken, async (req, res) => {
   const body = req.body as {
-    name?: string; sku?: string; description?: string; price?: string; cost?: string;
+    name?: string; sku?: string; description?: string; price?: string;
+    wholesalePrice1?: string; wholesalePrice2?: string; cost?: string;
     quantity?: number; minQuantity?: number; locationId?: string; categoryId?: string; unit?: string;
   };
   if (!body.name || !body.price) {
@@ -95,6 +100,8 @@ router.post("/", authenticateToken, async (req, res) => {
     sku: body.sku,
     description: body.description,
     price: body.price,
+    wholesalePrice1: body.wholesalePrice1,
+    wholesalePrice2: body.wholesalePrice2,
     cost: body.cost,
     quantity: body.quantity ?? 0,
     minQuantity: body.minQuantity ?? 0,
@@ -108,7 +115,7 @@ router.post("/", authenticateToken, async (req, res) => {
 router.patch("/:id", authenticateToken, async (req, res) => {
   const id = String(req.params.id);
   const body = req.body as Record<string, unknown>;
-  const allowed = ["name", "sku", "description", "price", "cost", "quantity", "minQuantity", "locationId", "categoryId", "unit", "isActive"];
+  const allowed = ["name", "sku", "description", "price", "wholesalePrice1", "wholesalePrice2", "cost", "quantity", "minQuantity", "locationId", "categoryId", "unit", "isActive"];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) updates[key] = body[key];

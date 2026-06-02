@@ -1,12 +1,13 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { useSalesMode, type SalesMode } from "@/lib/sales-mode";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, ShoppingCart, Package, CreditCard, BarChart2,
   ArrowLeftRight, Calendar, Settings, LogOut, Menu, X, Store, ChevronDown,
-  Users, ShieldCheck
+  Users, ShieldCheck, ClipboardList, Building2, ShoppingBag
 } from "lucide-react";
 import { useListLocations } from "@workspace/api-client-react";
 import {
@@ -26,8 +27,41 @@ const navItems = [
   { path: "/shifts", icon: Calendar, label: "Shifts" },
   { path: "/cashiers", icon: Users, label: "Cashiers", roles: ["admin", "manager"] },
   { path: "/audit", icon: ShieldCheck, label: "Audit", roles: ["admin", "manager"] },
+  { path: "/sales-logs", icon: ClipboardList, label: "Sales Logs", roles: ["admin", "manager"] },
   { path: "/settings", icon: Settings, label: "Settings" },
 ];
+
+function ModeToggle() {
+  const { salesMode, setSalesMode, isRetail } = useSalesMode();
+  return (
+    <div className="flex items-center rounded-lg border border-border bg-card p-0.5 gap-0.5">
+      <button
+        onClick={() => setSalesMode("retail")}
+        className={cn(
+          "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors",
+          isRetail
+            ? "bg-emerald-500 text-white"
+            : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        <ShoppingBag className="w-3 h-3" />
+        Retail
+      </button>
+      <button
+        onClick={() => setSalesMode("wholesale")}
+        className={cn(
+          "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors",
+          !isRetail
+            ? "bg-blue-600 text-white"
+            : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        <Building2 className="w-3 h-3" />
+        Wholesale
+      </button>
+    </div>
+  );
+}
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { user, logout, selectedLocationId, setSelectedLocationId } = useAuth();
@@ -144,12 +178,25 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Desktop header */}
+        <header className="hidden lg:flex items-center justify-between px-6 py-3 border-b border-border bg-card">
+          <div className="flex items-center gap-3">
+            <span className="font-semibold text-sm">MirrorTech POS</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <ModeToggle />
+          </div>
+        </header>
+
         {/* Mobile header */}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-border bg-card">
-          <button onClick={() => setSidebarOpen(true)} className="text-muted-foreground hover:text-foreground">
-            <Menu className="w-5 h-5" />
-          </button>
-          <span className="font-semibold text-sm">MirrorTech POS</span>
+        <header className="lg:hidden flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-card">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSidebarOpen(true)} className="text-muted-foreground hover:text-foreground">
+              <Menu className="w-5 h-5" />
+            </button>
+            <span className="font-semibold text-sm">MirrorTech POS</span>
+          </div>
+          <ModeToggle />
         </header>
 
         {/* Page content */}

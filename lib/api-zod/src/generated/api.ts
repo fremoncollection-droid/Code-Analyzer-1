@@ -178,6 +178,8 @@ export const ListInventoryResponseItem = zod.object({
   "description": zod.string().nullish(),
   "price": zod.string(),
   "cost": zod.string().nullish(),
+  "wholesalePrice1": zod.string().nullish(),
+  "wholesalePrice2": zod.string().nullish(),
   "quantity": zod.number(),
   "minQuantity": zod.number().optional(),
   "locationId": zod.string().nullish(),
@@ -198,6 +200,8 @@ export const CreateInventoryItemBody = zod.object({
   "sku": zod.string().optional(),
   "description": zod.string().optional(),
   "price": zod.string(),
+  "wholesalePrice1": zod.string().optional(),
+  "wholesalePrice2": zod.string().optional(),
   "cost": zod.string().optional(),
   "quantity": zod.number().optional(),
   "minQuantity": zod.number().optional(),
@@ -221,6 +225,8 @@ export const GetInventoryItemResponse = zod.object({
   "description": zod.string().nullish(),
   "price": zod.string(),
   "cost": zod.string().nullish(),
+  "wholesalePrice1": zod.string().nullish(),
+  "wholesalePrice2": zod.string().nullish(),
   "quantity": zod.number(),
   "minQuantity": zod.number().optional(),
   "locationId": zod.string().nullish(),
@@ -244,6 +250,8 @@ export const UpdateInventoryItemBody = zod.object({
   "sku": zod.string().optional(),
   "description": zod.string().optional(),
   "price": zod.string().optional(),
+  "wholesalePrice1": zod.string().optional(),
+  "wholesalePrice2": zod.string().optional(),
   "cost": zod.string().optional(),
   "quantity": zod.number().optional(),
   "minQuantity": zod.number().optional(),
@@ -260,6 +268,8 @@ export const UpdateInventoryItemResponse = zod.object({
   "description": zod.string().nullish(),
   "price": zod.string(),
   "cost": zod.string().nullish(),
+  "wholesalePrice1": zod.string().nullish(),
+  "wholesalePrice2": zod.string().nullish(),
   "quantity": zod.number(),
   "minQuantity": zod.number().optional(),
   "locationId": zod.string().nullish(),
@@ -308,6 +318,7 @@ export const ListTransactionsQueryParams = zod.object({
   "startDate": zod.coerce.string().optional(),
   "endDate": zod.coerce.string().optional(),
   "paymentMethod": zod.coerce.string().optional(),
+  "salesMode": zod.enum(['retail', 'wholesale']).optional(),
   "limit": zod.coerce.number().optional(),
   "offset": zod.coerce.number().optional()
 })
@@ -340,6 +351,9 @@ export const ListTransactionsResponse = zod.object({
   "notes": zod.string().nullish(),
   "isVoided": zod.boolean().optional(),
   "voidReason": zod.string().nullish(),
+  "salesMode": zod.string().nullish(),
+  "wholesaleTier": zod.number().nullish(),
+  "customerId": zod.string().nullish(),
   "createdAt": zod.string()
 })),
   "total": zod.number()
@@ -365,10 +379,13 @@ export const CreateTransactionBody = zod.object({
 
 }).passthrough().optional(),
   "total": zod.string(),
-  "paymentMethod": zod.enum(['cash', 'momo', 'card']),
+  "paymentMethod": zod.enum(['cash', 'momo', 'card', 'net30', 'purchase_order']),
   "momoPhone": zod.string().optional(),
   "momoNetwork": zod.string().optional(),
   "momoReference": zod.string().optional(),
+  "salesMode": zod.enum(['retail', 'wholesale']).optional(),
+  "wholesaleTier": zod.number().nullish(),
+  "customerId": zod.string().nullish(),
   "customerName": zod.string().optional(),
   "customerPhone": zod.string().optional(),
   "notes": zod.string().optional()
@@ -409,6 +426,9 @@ export const GetTransactionResponse = zod.object({
   "notes": zod.string().nullish(),
   "isVoided": zod.boolean().optional(),
   "voidReason": zod.string().nullish(),
+  "salesMode": zod.string().nullish(),
+  "wholesaleTier": zod.number().nullish(),
+  "customerId": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -451,6 +471,9 @@ export const VoidTransactionResponse = zod.object({
   "notes": zod.string().nullish(),
   "isVoided": zod.boolean().optional(),
   "voidReason": zod.string().nullish(),
+  "salesMode": zod.string().nullish(),
+  "wholesaleTier": zod.number().nullish(),
+  "customerId": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -490,6 +513,9 @@ export const GetReceiptResponse = zod.object({
   "notes": zod.string().nullish(),
   "isVoided": zod.boolean().optional(),
   "voidReason": zod.string().nullish(),
+  "salesMode": zod.string().nullish(),
+  "wholesaleTier": zod.number().nullish(),
+  "customerId": zod.string().nullish(),
   "createdAt": zod.string()
 }),
   "location": zod.object({
@@ -525,10 +551,13 @@ export const SyncOfflineTransactionsBody = zod.object({
 
 }).passthrough().optional(),
   "total": zod.string(),
-  "paymentMethod": zod.enum(['cash', 'momo', 'card']),
+  "paymentMethod": zod.enum(['cash', 'momo', 'card', 'net30', 'purchase_order']),
   "momoPhone": zod.string().optional(),
   "momoNetwork": zod.string().optional(),
   "momoReference": zod.string().optional(),
+  "salesMode": zod.enum(['retail', 'wholesale']).optional(),
+  "wholesaleTier": zod.number().nullish(),
+  "customerId": zod.string().nullish(),
   "customerName": zod.string().optional(),
   "customerPhone": zod.string().optional(),
   "notes": zod.string().optional()
@@ -1040,6 +1069,7 @@ export const ListAuditLogsResponseItem = zod.object({
 }).passthrough().optional(),
   "ipAddress": zod.string().nullish(),
   "userAgent": zod.string().nullish(),
+  "salesMode": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListAuditLogsResponse = zod.array(ListAuditLogsResponseItem)
@@ -1071,6 +1101,51 @@ export const MomoWebhookBody = zod.object({
   "status": zod.string().optional(),
   "amount": zod.string().optional(),
   "phone": zod.string().optional()
+})
+
+
+/**
+ * @summary List sales logs
+ */
+export const ListSalesLogsQueryParams = zod.object({
+  "salespersonId": zod.coerce.string().optional(),
+  "salesMode": zod.enum(['retail', 'wholesale']).optional(),
+  "action": zod.coerce.string().optional(),
+  "startDate": zod.coerce.string().optional(),
+  "endDate": zod.coerce.string().optional(),
+  "limit": zod.coerce.number().optional(),
+  "offset": zod.coerce.number().optional()
+})
+
+export const ListSalesLogsResponseItem = zod.object({
+  "id": zod.string(),
+  "salespersonId": zod.string().optional(),
+  "salespersonName": zod.string().nullish(),
+  "salesMode": zod.enum(['retail', 'wholesale']).optional(),
+  "action": zod.string(),
+  "details": zod.string().nullish(),
+  "productId": zod.string().nullish(),
+  "orderId": zod.string().nullish(),
+  "quantity": zod.number().nullish(),
+  "unitPrice": zod.string().nullish(),
+  "total": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListSalesLogsResponse = zod.array(ListSalesLogsResponseItem)
+
+
+/**
+ * @summary Create sales log entry
+ */
+export const CreateSalesLogBody = zod.object({
+  "action": zod.string(),
+  "details": zod.string().optional(),
+  "productId": zod.string().optional(),
+  "orderId": zod.string().optional(),
+  "quantity": zod.number().optional(),
+  "unitPrice": zod.string().optional(),
+  "total": zod.string().optional(),
+  "salesMode": zod.enum(['retail', 'wholesale']).optional()
 })
 
 

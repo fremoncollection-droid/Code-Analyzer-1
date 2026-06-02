@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, varchar, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, varchar, boolean, integer, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -9,6 +9,9 @@ export const usersTable = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   pinHash: text("pin_hash"),
   role: varchar("role", { length: 20 }).notNull().default("cashier"),
+  customerType: varchar("customer_type", { length: 20 }).default("retail"),
+  wholesaleTier: integer("wholesale_tier"),
+  taxExempt: boolean("tax_exempt").default(false),
   locationId: uuid("location_id"),
   station: varchar("station", { length: 50 }),
   isActive: boolean("is_active").notNull().default(true),

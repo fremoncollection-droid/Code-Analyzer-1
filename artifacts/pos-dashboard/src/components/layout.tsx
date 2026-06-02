@@ -1,6 +1,7 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { useBranding } from "@/lib/branding";
 import { useSalesMode, type SalesMode } from "@/lib/sales-mode";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -66,12 +67,16 @@ function ModeToggle() {
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { user, logout, selectedLocationId, setSelectedLocationId } = useAuth();
+  const { branding } = useBranding();
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { data: locations } = useListLocations();
 
   const selectedLocation = locations?.find(l => l.id === selectedLocationId);
   const canSwitchLocation = user?.role === "admin" || user?.role === "manager";
+
+  const appName = branding.isLoading ? "MirrorTech" : branding.appName.split(" ")[0] || "MirrorTech";
+  const appSub = branding.isLoading ? "POS System" : branding.appName.split(" ").slice(1).join(" ") || "POS";
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -90,12 +95,16 @@ export default function Layout({ children }: { children: ReactNode }) {
       )}>
         {/* Logo */}
         <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
-          <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
-            <Store className="w-4 h-4 text-sidebar-primary-foreground" />
+          <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center overflow-hidden">
+            {branding.logoUrl ? (
+              <img src={branding.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+            ) : (
+              <Store className="w-4 h-4 text-sidebar-primary-foreground" />
+            )}
           </div>
           <div>
-            <p className="font-bold text-sidebar-foreground text-sm">MirrorTech</p>
-            <p className="text-xs text-sidebar-foreground/50">POS System</p>
+            <p className="font-bold text-sidebar-foreground text-sm">{appName}</p>
+            <p className="text-xs text-sidebar-foreground/50">{appSub}</p>
           </div>
           <button className="ml-auto lg:hidden text-sidebar-foreground/50 hover:text-sidebar-foreground" onClick={() => setSidebarOpen(false)}>
             <X className="w-4 h-4" />
@@ -182,7 +191,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         {/* Desktop header */}
         <header className="hidden lg:flex items-center justify-between px-6 py-3 border-b border-border bg-card">
           <div className="flex items-center gap-3">
-            <span className="font-semibold text-sm">MirrorTech POS</span>
+            <span className="font-semibold text-sm">{branding.appName}</span>
           </div>
           <div className="flex items-center gap-3">
             <ModeToggle />
@@ -195,7 +204,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             <button onClick={() => setSidebarOpen(true)} className="text-muted-foreground hover:text-foreground">
               <Menu className="w-5 h-5" />
             </button>
-            <span className="font-semibold text-sm">MirrorTech POS</span>
+            <span className="font-semibold text-sm">{branding.appName}</span>
           </div>
           <ModeToggle />
         </header>

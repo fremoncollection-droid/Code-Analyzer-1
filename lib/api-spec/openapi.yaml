@@ -1119,6 +1119,19 @@ paths:
         "403":
           description: Forbidden
 
+  /public/settings:
+    get:
+      operationId: getPublicSettings
+      tags: [settings]
+      summary: Get public settings (no auth required)
+      responses:
+        "200":
+          description: Public settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsMap"
+
   /users:
     get:
       operationId: listUsers

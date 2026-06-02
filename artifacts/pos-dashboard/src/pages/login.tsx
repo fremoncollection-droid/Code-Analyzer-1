@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { useBranding } from "@/lib/branding";
 import { useLogin, usePinLogin } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const { branding } = useBranding();
   const { toast } = useToast();
   const [mode, setMode] = useState<"password" | "pin">("password");
   const [username, setUsername] = useState("");
@@ -86,10 +88,14 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-teal-500 flex items-center justify-center mb-4 shadow-lg shadow-teal-500/30">
-            <Store className="w-8 h-8 text-white" />
+          <div className="w-16 h-16 rounded-2xl bg-teal-500 flex items-center justify-center mb-4 shadow-lg shadow-teal-500/30 overflow-hidden">
+            {branding.logoUrl ? (
+              <img src={branding.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+            ) : (
+              <Store className="w-8 h-8 text-white" />
+            )}
           </div>
-          <h1 className="text-2xl font-bold text-white">MirrorTech POS</h1>
+          <h1 className="text-2xl font-bold text-white">{branding.isLoading ? "Loading..." : branding.appName}</h1>
           <p className="text-slate-400 text-sm mt-1">Sign in to continue</p>
         </div>
 

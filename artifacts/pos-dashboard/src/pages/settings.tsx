@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "@/lib/auth";
+import { useBranding } from "@/lib/branding";
 import {
   useListLocations,
   useCreateLocation,
@@ -47,6 +48,8 @@ import {
   Box,
   Warehouse,
   AlertTriangle,
+  Image,
+  Save,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -82,6 +85,13 @@ export default function SettingsPage() {
   const [shelfForm, setShelfForm] = useState({ id: "", name: "", zone: "", capacity: "" });
   const [shelfEditing, setShelfEditing] = useState(false);
   const [shelfDeleteConfirm, setShelfDeleteConfirm] = useState<string | null>(null);
+
+  // Branding state
+  const [brandName, setBrandName] = useState("");
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { refresh } = useBranding();
 
   // Data queries
   const { data: locations } = useListLocations();
@@ -582,6 +592,81 @@ export default function SettingsPage() {
                 setVatRate(""); setNhilRate(""); setGetFundRate(""); setCovidRate("");
               }} disabled={updateSettings.isPending || (!vatRate && !nhilRate && !getFundRate && !covidRate)}>
                 <Percent className="w-3 h-3 mr-1" /> Save Tax Rates
+              </Button>
+            </div>
+
+            {/* Branding */}
+            <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+              <p className="text-sm font-medium flex items-center gap-2"><Image className="w-4 h-4" /> Branding</p>
+              <div className="space-y-2">
+                <Label className="text-xs">App Name</Label>
+                <Input value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder={settings?.app_name || "MirrorTech POS"} className="h-8 text-sm" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Logo</Label>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-lg border border-border bg-white flex items-center justify-center overflow-hidden">
+                    {logoPreview ? (
+                      <img src={logoPreview} alt="Preview" className="w-full h-full object-cover" />
+                    ) : settings?.logo_url ? (
+                      <img src={settings.logo_url} alt="Current" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No logo</span>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      setLogoFile(f);
+                      const reader = new FileReader();
+                      reader.onload = () => setLogoPreview(reader.result as string);
+                      reader.readAsDataURL(f);
+                    }}
+                  />
+                  <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                    Choose File
+                  </Button>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1"
+                onClick={async () => {
+                  const name = brandName.trim() || settings?.app_name;
+                  if (!name && !logoFile) { toast({ title: "Nothing to save", variant: "destructive" }); return; }
+                  try {
+                    const token = localStorage.getItem("pos_token");
+                    if (logoFile) {
+                      const fd = new FormData();
+                      fd.append("logo", logoFile);
+                      const res = await fetch("/api/upload/logo", {
+                        method: "POST",
+                        headers: { Authorization: `Bearer ${token}` },
+                        body: fd,
+                      });
+                      if (!res.ok) throw new Error("Upload failed");
+                    }
+                    if (name) {
+                      updateSettings.mutate({ data: { app_name: name } });
+                    }
+                    setBrandName("");
+                    setLogoFile(null);
+                    setLogoPreview(null);
+                    refresh();
+                    toast({ title: "Branding saved" });
+                  } catch {
+                    toast({ title: "Save failed", variant: "destructive" });
+                  }
+                }}
+                disabled={updateSettings.isPending || (!brandName && !logoFile)}
+              >
+                <Save className="w-3 h-3" /> Save Branding
               </Button>
             </div>
           </CardContent>

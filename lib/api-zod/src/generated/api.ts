@@ -1127,6 +1127,12 @@ export const UpdateSettingsResponse = zod.record(zod.string(), zod.string())
 
 
 /**
+ * @summary Get public settings (no auth required)
+ */
+export const GetPublicSettingsResponse = zod.record(zod.string(), zod.string())
+
+
+/**
  * @summary List users (admin/manager only)
  */
 export const ListUsersQueryParams = zod.object({

@@ -109,8 +109,6 @@ export default function POSPage() {
   const { data: categories } = useListCategories();
   const { data: inventory, isLoading: invLoading } = useListInventory({
     locationId: selectedLocationId ?? undefined,
-    search: search || undefined,
-    categoryId: selectedCategory ?? undefined,
   });
   const { data: locations } = useListLocations();
   const { data: settings } = useGetSettings();
@@ -457,7 +455,14 @@ export default function POSPage() {
   const cartItems = cart.length;
   const cartItemCount = cart.reduce((s, c) => s + c.quantity, 0);
   const items = inventory ?? [];
-  const filtered = items;
+  const filtered = items.filter(item => {
+    if (selectedCategory && item.categoryId !== selectedCategory) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return item.name.toLowerCase().includes(q) || (item.sku?.toLowerCase().includes(q) ?? false);
+    }
+    return true;
+  });
 
   return (
     <div className="flex h-[calc(100vh-56px)] lg:h-screen overflow-hidden">

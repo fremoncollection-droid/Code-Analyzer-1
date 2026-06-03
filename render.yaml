@@ -3,7 +3,8 @@ services:
     name: mirrortech-pos
     runtime: node
     plan: free
-    buildCommand: cd render-app && npm run build
+    # Updated line below to force-install vite before building
+    buildCommand: cd render-app && npm install --production=false && npm run build
     startCommand: cd render-app && npm start
     envVars:
       - key: NODE_ENV

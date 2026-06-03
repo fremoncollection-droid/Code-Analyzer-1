@@ -942,9 +942,9 @@ async function initDatabase() {
 
 // ============ AUTO-CLEANUP ============
 const RETENTION_DAYS = {
-  transactions: 90,     // Keep 90 days of sales
-  audit_log: 30,        // Keep 30 days of audit
-  sales_logs: 30,       // Keep 30 days of sales logs
+  transactions: 270,    // Keep 270 days of sales (9 months)
+  audit_log: 180,       // Keep 180 days of audit (6 months)
+  sales_logs: 180,      // Keep 180 days of sales logs (6 months)
 };
 
 async function runCleanup() {

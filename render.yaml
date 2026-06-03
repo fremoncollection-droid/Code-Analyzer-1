@@ -18,3 +18,7 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+
+databases:
+  - name: mirrortech-pos-db
+    plan: free

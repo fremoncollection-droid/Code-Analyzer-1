@@ -20,21 +20,16 @@ router.post("/initiate", authenticateToken, async (req, res) => {
   }
 
   // In a real integration you would call MTN/Telecel USSD Push API here.
-  // For now we simulate a pending payment.
+  // For now we store a pending payment — the cashier must manually confirm after
+  // the customer shows them the approval on their phone.
   const ref = reference ?? nanoid(12);
   momoPayments.set(ref, { status: "pending", phone, amount, network });
-
-  // Simulate async completion after 3 seconds (in production: webhook or polling)
-  setTimeout(() => {
-    const p = momoPayments.get(ref);
-    if (p) p.status = "successful";
-  }, 3000);
 
   res.json({
     success: true,
     reference: ref,
     status: "pending",
-    message: `Payment request sent to ${phone}. Ask customer to approve on their phone.`,
+    message: `Payment request recorded for ${phone}. Ask the customer to approve on their phone.`,
   });
 });
 
@@ -52,6 +47,18 @@ router.get("/status/:reference", authenticateToken, async (req, res) => {
     phone: payment.phone,
     message: payment.status === "successful" ? "Payment confirmed" : "Awaiting confirmation",
   });
+});
+
+// Cashier manually confirms payment after customer shows phone approval
+router.post("/confirm/:reference", authenticateToken, (req, res) => {
+  const reference = String(req.params.reference);
+  const payment = momoPayments.get(reference);
+  if (!payment) {
+    res.status(404).json({ error: "Payment not found" });
+    return;
+  }
+  payment.status = "successful";
+  res.json({ success: true, reference, status: "successful" });
 });
 
 router.post("/webhook", async (req, res) => {

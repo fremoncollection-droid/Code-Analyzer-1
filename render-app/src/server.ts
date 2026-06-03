@@ -821,14 +821,20 @@ app.post("/api/momo/initiate", authenticateToken, async (req, res) => {
   if (!phone || !network || !amount) { res.status(400).json({ error: "phone, network, amount required" }); return; }
   const ref = reference ?? nanoid(12);
   momoPayments.set(ref, { status: "pending", phone, amount, network });
-  setTimeout(() => { const p = momoPayments.get(ref); if (p) p.status = "successful"; }, 3000);
-  res.json({ success: true, reference: ref, status: "pending", message: `Payment request sent to ${phone}` });
+  res.json({ success: true, reference: ref, status: "pending", message: `Payment request recorded for ${phone}. Ask the customer to approve on their phone.` });
 });
 
 app.get("/api/momo/status/:reference", authenticateToken, async (req, res) => {
   const payment = momoPayments.get(String(req.params.reference));
   if (!payment) { res.json({ reference: req.params.reference, status: "not_found", amount: null, phone: null }); return; }
   res.json({ reference: req.params.reference, status: payment.status, amount: payment.amount, phone: payment.phone });
+});
+
+app.post("/api/momo/confirm/:reference", authenticateToken, (req, res) => {
+  const payment = momoPayments.get(String(req.params.reference));
+  if (!payment) { res.status(404).json({ error: "Payment not found" }); return; }
+  payment.status = "successful";
+  res.json({ success: true, reference: req.params.reference, status: "successful" });
 });
 
 // ============ STATIC FILES ============

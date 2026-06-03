@@ -98,6 +98,7 @@ export default function POSPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerSearch, setCustomerSearch] = useState("");
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [momoConfirming, setMomoConfirming] = useState(false);
   const [showScannerHint, setShowScannerHint] = useState(false);
   const [quickScan, setQuickScan] = useState(false);
   const [cameraScanOpen, setCameraScanOpen] = useState(false);
@@ -427,6 +428,23 @@ export default function POSPage() {
   function handleMoMoInitiate() {
     if (!momoPhone) { toast({ title: "Enter MoMo phone number", variant: "destructive" }); return; }
     initiateMoMo.mutate({ data: { phone: momoPhone, network: momoNetwork, amount: total.toFixed(2), reference: `POS-${Date.now()}` } });
+  }
+
+  async function handleMoMoConfirm() {
+    if (!momoRef) return;
+    setMomoConfirming(true);
+    try {
+      const token = localStorage.getItem("pos_token");
+      const res = await fetch(`/api/momo/confirm/${momoRef}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Confirm failed");
+    } catch {
+      toast({ title: "Could not confirm payment", variant: "destructive" });
+    } finally {
+      setMomoConfirming(false);
+    }
   }
 
   // --- Receipt print handler ---
@@ -971,9 +989,12 @@ export default function POSPage() {
                     <CheckCircle2 className="w-4 h-4" /> Payment confirmed!
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-yellow-700 text-sm">
-                    <div className="w-3 h-3 rounded-full border-2 border-yellow-500 border-t-transparent animate-spin" />
-                    Waiting for customer approval...
+                  <div className="space-y-2">
+                    <p className="text-xs text-yellow-700">Ask the customer to approve the payment on their phone, then tap below once they show you their confirmation.</p>
+                    <Button size="sm" className="w-full bg-yellow-500 hover:bg-yellow-600 text-white" onClick={handleMoMoConfirm} disabled={momoConfirming}>
+                      <CheckCircle2 className="w-3 h-3 mr-1" />
+                      {momoConfirming ? "Confirming..." : "Confirm Payment Received"}
+                    </Button>
                   </div>
                 )}
               </div>

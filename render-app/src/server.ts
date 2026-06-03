@@ -186,9 +186,73 @@ app.post("/api/categories", authenticateToken, async (req, res) => {
   res.status(201).json(row);
 });
 app.patch("/api/categories/:id", authenticateToken, async (req, res) => {
-  const [row] = await db.update(categoriesTable).set(req.body).where(eq(categoriesTable.id, String(req.params.id))).returning();
+  const { name, color, description } = req.body;
+  if (!name) { res.status(400).json({ error: "name required" }); return; }
+  const [row] = await db.update(categoriesTable).set({ name, color, description }).where(eq(categoriesTable.id, String(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   res.json(row);
+});
+app.delete("/api/categories/:id", authenticateToken, async (req, res) => {
+  const id = String(req.params.id);
+  const linked = await db.select({ id: inventoryTable.id }).from(inventoryTable).where(and(eq(inventoryTable.categoryId, id), eq(inventoryTable.isActive, true))).limit(1);
+  if (linked.length > 0) { res.status(400).json({ error: "Cannot delete: category has active inventory items" }); return; }
+  const [row] = await db.delete(categoriesTable).where(eq(categoriesTable.id, id)).returning();
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  res.status(204).send();
+});
+
+// ============ UNITS ============
+app.get("/api/units", authenticateToken, async (_req, res) => {
+  const rows = await db.select().from(unitsTable).orderBy(unitsTable.name);
+  res.json(rows);
+});
+app.post("/api/units", authenticateToken, async (req, res) => {
+  const { name, abbreviation } = req.body;
+  if (!name || !abbreviation) { res.status(400).json({ error: "name and abbreviation required" }); return; }
+  const [row] = await db.insert(unitsTable).values({ name, abbreviation }).returning();
+  res.status(201).json(row);
+});
+app.put("/api/units/:id", authenticateToken, async (req, res) => {
+  const { name, abbreviation } = req.body;
+  if (!name || !abbreviation) { res.status(400).json({ error: "name and abbreviation required" }); return; }
+  const [row] = await db.update(unitsTable).set({ name, abbreviation }).where(eq(unitsTable.id, String(req.params.id))).returning();
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(row);
+});
+app.delete("/api/units/:id", authenticateToken, async (req, res) => {
+  const id = String(req.params.id);
+  const linked = await db.select({ id: inventoryTable.id }).from(inventoryTable).where(and(eq(inventoryTable.unitId, id), eq(inventoryTable.isActive, true))).limit(1);
+  if (linked.length > 0) { res.status(400).json({ error: "Cannot delete: items are currently assigned to this unit" }); return; }
+  const [row] = await db.delete(unitsTable).where(eq(unitsTable.id, id)).returning();
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  res.status(204).send();
+});
+
+// ============ SHELVES ============
+app.get("/api/shelves", authenticateToken, async (_req, res) => {
+  const rows = await db.select().from(shelvesTable).orderBy(shelvesTable.name);
+  res.json(rows);
+});
+app.post("/api/shelves", authenticateToken, async (req, res) => {
+  const { name, zone, capacity } = req.body;
+  if (!name || !zone) { res.status(400).json({ error: "name and zone required" }); return; }
+  const [row] = await db.insert(shelvesTable).values({ name, zone, capacity: capacity ?? 0 }).returning();
+  res.status(201).json(row);
+});
+app.put("/api/shelves/:id", authenticateToken, async (req, res) => {
+  const { name, zone, capacity } = req.body;
+  if (!name || !zone) { res.status(400).json({ error: "name and zone required" }); return; }
+  const [row] = await db.update(shelvesTable).set({ name, zone, capacity: capacity ?? 0 }).where(eq(shelvesTable.id, String(req.params.id))).returning();
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(row);
+});
+app.delete("/api/shelves/:id", authenticateToken, async (req, res) => {
+  const id = String(req.params.id);
+  const linked = await db.select({ id: inventoryTable.id }).from(inventoryTable).where(and(eq(inventoryTable.shelfId, id), eq(inventoryTable.isActive, true))).limit(1);
+  if (linked.length > 0) { res.status(400).json({ error: "Cannot delete: items are currently assigned to this shelf" }); return; }
+  const [row] = await db.delete(shelvesTable).where(eq(shelvesTable.id, id)).returning();
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  res.status(204).send();
 });
 
 // ============ INVENTORY ============
@@ -416,6 +480,16 @@ app.get("/api/leads/pipeline/summary", authenticateToken, authorize("manager", "
   res.json(results);
 });
 
+app.get("/api/leads/:id", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const id = String(req.params.id);
+  const [lead] = await db.select({ id: leadsTable.id, name: leadsTable.name, phone: leadsTable.phone, email: leadsTable.email, status: leadsTable.status, source: leadsTable.source, notes: leadsTable.notes, estimatedValue: leadsTable.estimatedValue, assignedTo: leadsTable.assignedTo, locationId: leadsTable.locationId, lastContactedAt: leadsTable.lastContactedAt, createdAt: leadsTable.createdAt }).from(leadsTable).where(eq(leadsTable.id, id)).limit(1);
+  if (!lead) { res.status(404).json({ error: "Not found" }); return; }
+  if (user.role === "cashier" && lead.assignedTo !== user.id) { res.status(403).json({ error: "You can only access your own leads" }); return; }
+  if (user.role === "manager" && lead.locationId !== user.locationId) { res.status(403).json({ error: "This lead is not in your location" }); return; }
+  res.json(lead);
+});
+
 app.post("/api/leads", authenticateToken, async (req, res) => {
   const user = (req as any).user;
   const { name, phone, email, status, source, notes, estimatedValue, assignedTo, locationId } = req.body;
@@ -483,6 +557,15 @@ app.patch("/api/tasks/:id", authenticateToken, async (req, res) => {
   if (updates.completed === true) updates.completedAt = new Date();
   const [updated] = await db.update(tasksTable).set(updates as any).where(eq(tasksTable.id, String(req.params.id))).returning();
   res.json(updated);
+});
+app.delete("/api/tasks/:id", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const id = String(req.params.id);
+  const [existing] = await db.select({ userId: tasksTable.userId }).from(tasksTable).where(eq(tasksTable.id, id)).limit(1);
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (user.role === "cashier" && existing.userId !== user.id) { res.status(403).json({ error: "Not yours" }); return; }
+  await db.delete(tasksTable).where(eq(tasksTable.id, id));
+  res.status(204).send();
 });
 
 // ============ DISCOUNT REQUESTS ============

@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { nanoid } from "nanoid";
 import { eq, and, gte, lte, desc, count, sql } from "drizzle-orm";
-import { db } from "./db.js";
+import { db, pool } from "./db.js";
 import { authenticateToken, authorize } from "./auth.js";
 import {
   usersTable, locationsTable, categoriesTable, unitsTable, shelvesTable,
@@ -704,7 +704,242 @@ app.use((req, res, next) => {
   res.sendFile(path.join(__dirname, "../public/index.html"));
 });
 
+// ============ AUTO-CREATE TABLES ============
+async function initDatabase() {
+  const client = await pool.connect();
+  try {
+    await client.query(`CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      username VARCHAR(100) NOT NULL UNIQUE,
+      email VARCHAR(255) NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      pin_hash TEXT,
+      role VARCHAR(20) NOT NULL DEFAULT 'cashier',
+      customer_type VARCHAR(20) DEFAULT 'retail',
+      wholesale_tier INTEGER,
+      monthly_target NUMERIC(12,2),
+      tax_exempt BOOLEAN DEFAULT false,
+      location_id UUID,
+      station VARCHAR(50),
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS locations (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR(200) NOT NULL,
+      address TEXT,
+      phone VARCHAR(30),
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS categories (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR(100) NOT NULL,
+      color VARCHAR(7) NOT NULL DEFAULT '#3B82F6',
+      description TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS units (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR(100) NOT NULL,
+      abbreviation VARCHAR(10) NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS shelves (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR(100) NOT NULL,
+      zone VARCHAR(100) NOT NULL,
+      capacity INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS inventory (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR(200) NOT NULL,
+      sku VARCHAR(100) UNIQUE,
+      description TEXT,
+      price NUMERIC(12,2) NOT NULL,
+      wholesale_price_1 NUMERIC(12,2),
+      wholesale_price_2 NUMERIC(12,2),
+      cost NUMERIC(12,2),
+      quantity INTEGER NOT NULL DEFAULT 0,
+      min_quantity INTEGER NOT NULL DEFAULT 0,
+      location_id UUID REFERENCES locations(id),
+      category_id UUID REFERENCES categories(id),
+      unit_id UUID REFERENCES units(id),
+      shelf_id UUID REFERENCES shelves(id),
+      unit VARCHAR(30) DEFAULT 'piece',
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS transactions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      receipt_number VARCHAR(50) NOT NULL UNIQUE,
+      location_id UUID NOT NULL REFERENCES locations(id),
+      shift_id UUID,
+      cashier_id UUID REFERENCES users(id),
+      items JSONB NOT NULL,
+      subtotal NUMERIC(12,2) NOT NULL,
+      tax_amount NUMERIC(12,2) NOT NULL,
+      tax_breakdown JSONB,
+      total NUMERIC(12,2) NOT NULL,
+      payment_method VARCHAR(30) NOT NULL,
+      payment_status VARCHAR(20) NOT NULL DEFAULT 'completed',
+      momo_phone VARCHAR(20),
+      momo_network VARCHAR(20),
+      momo_reference VARCHAR(100),
+      sales_mode VARCHAR(20) NOT NULL DEFAULT 'retail',
+      wholesale_tier INTEGER,
+      customer_id UUID,
+      customer_name VARCHAR(200),
+      customer_phone VARCHAR(30),
+      notes TEXT,
+      is_voided BOOLEAN NOT NULL DEFAULT false,
+      void_reason TEXT,
+      approved_by UUID,
+      synced BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS shifts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id),
+      location_id UUID NOT NULL REFERENCES locations(id),
+      start_time TIMESTAMPTZ NOT NULL,
+      end_time TIMESTAMPTZ,
+      status VARCHAR(20) NOT NULL DEFAULT 'scheduled',
+      opening_float NUMERIC(12,2),
+      closing_float NUMERIC(12,2),
+      expected_cash NUMERIC(12,2),
+      expected_momo NUMERIC(12,2),
+      expected_card NUMERIC(12,2),
+      actual_cash NUMERIC(12,2),
+      actual_momo NUMERIC(12,2),
+      actual_card NUMERIC(12,2),
+      variance_cash NUMERIC(12,2),
+      variance_momo NUMERIC(12,2),
+      variance_card NUMERIC(12,2),
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS transfers (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      item_id UUID NOT NULL REFERENCES inventory(id),
+      from_location_id UUID NOT NULL REFERENCES locations(id),
+      to_location_id UUID NOT NULL REFERENCES locations(id),
+      quantity INTEGER NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      notes TEXT,
+      requested_by_id UUID REFERENCES users(id),
+      approved_by_id UUID REFERENCES users(id),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS audit_log (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id),
+      approved_by UUID REFERENCES users(id),
+      action VARCHAR(100) NOT NULL,
+      table_name VARCHAR(100),
+      record_id UUID,
+      old_values JSONB,
+      new_values JSONB,
+      ip_address VARCHAR(45),
+      user_agent TEXT,
+      sales_mode VARCHAR(20),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS settings (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      key VARCHAR(100) NOT NULL UNIQUE,
+      value VARCHAR(500) NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS sales_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      salesperson_id UUID REFERENCES users(id),
+      sales_mode VARCHAR(20) NOT NULL DEFAULT 'retail',
+      action VARCHAR(100) NOT NULL,
+      details TEXT,
+      product_id UUID,
+      order_id UUID,
+      quantity INTEGER,
+      unit_price VARCHAR(30),
+      total VARCHAR(30),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS leads (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR(200) NOT NULL,
+      phone VARCHAR(30),
+      email VARCHAR(255),
+      status VARCHAR(30) NOT NULL DEFAULT 'new',
+      source VARCHAR(50) DEFAULT 'walk-in',
+      notes TEXT,
+      estimated_value VARCHAR(20),
+      assigned_to UUID REFERENCES users(id),
+      location_id UUID REFERENCES locations(id),
+      last_contacted_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS tasks (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id),
+      title VARCHAR(200) NOT NULL,
+      description TEXT,
+      type VARCHAR(30) NOT NULL DEFAULT 'call',
+      due_date TIMESTAMPTZ NOT NULL,
+      priority VARCHAR(10) NOT NULL DEFAULT 'medium',
+      completed BOOLEAN NOT NULL DEFAULT false,
+      completed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS discount_requests (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      transaction_id UUID REFERENCES transactions(id),
+      customer_name VARCHAR(200),
+      requested_amount NUMERIC(12,2) NOT NULL,
+      original_amount NUMERIC(12,2) NOT NULL,
+      reason TEXT NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      requested_by UUID NOT NULL REFERENCES users(id),
+      approved_by UUID REFERENCES users(id),
+      approved_at TIMESTAMPTZ,
+      rejection_reason TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS user_permissions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id),
+      module VARCHAR(50) NOT NULL,
+      can_view BOOLEAN NOT NULL DEFAULT false,
+      can_create BOOLEAN NOT NULL DEFAULT false,
+      can_edit BOOLEAN NOT NULL DEFAULT false,
+      can_delete BOOLEAN NOT NULL DEFAULT false,
+      can_approve BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT user_permissions_user_module_unique UNIQUE (user_id, module)
+    )`);
+    console.log("Database tables initialized");
+  } catch (err) {
+    console.error("Database init error:", err);
+  } finally {
+    client.release();
+  }
+}
+
+// ============ START SERVER ============
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+initDatabase().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
 });
+

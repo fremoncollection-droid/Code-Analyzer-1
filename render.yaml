@@ -3,8 +3,8 @@ services:
     name: mirrortech-pos
     runtime: node
     plan: free
-    buildCommand: npm run build
-    startCommand: npm start
+    buildCommand: cd render-app && npm run build
+    startCommand: cd render-app && npm start
     envVars:
       - key: NODE_ENV
         value: production

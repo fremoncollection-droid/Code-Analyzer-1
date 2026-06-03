@@ -940,9 +940,85 @@ async function initDatabase() {
   }
 }
 
+// ============ AUTO-CLEANUP ============
+const RETENTION_DAYS = {
+  transactions: 90,     // Keep 90 days of sales
+  audit_log: 30,        // Keep 30 days of audit
+  sales_logs: 30,       // Keep 30 days of sales logs
+};
+
+async function runCleanup() {
+  const now = new Date();
+  try {
+    // Delete old transactions
+    const txResult = await pool.query(
+      `DELETE FROM transactions WHERE created_at < NOW() - INTERVAL '${RETENTION_DAYS.transactions} days' RETURNING id`
+    );
+    if (txResult.rowCount > 0) {
+      console.log(`Cleanup: deleted ${txResult.rowCount} old transactions (older than ${RETENTION_DAYS.transactions} days)`);
+    }
+
+    // Delete old audit logs
+    const auditResult = await pool.query(
+      `DELETE FROM audit_log WHERE created_at < NOW() - INTERVAL '${RETENTION_DAYS.audit_log} days' RETURNING id`
+    );
+    if (auditResult.rowCount > 0) {
+      console.log(`Cleanup: deleted ${auditResult.rowCount} old audit logs (older than ${RETENTION_DAYS.audit_log} days)`);
+    }
+
+    // Delete old sales logs
+    const salesResult = await pool.query(
+      `DELETE FROM sales_logs WHERE created_at < NOW() - INTERVAL '${RETENTION_DAYS.sales_logs} days' RETURNING id`
+    );
+    if (salesResult.rowCount > 0) {
+      console.log(`Cleanup: deleted ${salesResult.rowCount} old sales logs (older than ${RETENTION_DAYS.sales_logs} days)`);
+    }
+
+    // Get current database size estimate
+    const sizeResult = await pool.query(`
+      SELECT pg_size_pretty(pg_database_size(current_database())) as size
+    `);
+    console.log(`Cleanup: database size is ${sizeResult.rows[0].size}`);
+
+  } catch (err) {
+    console.error("Cleanup error:", err);
+  }
+}
+
+// Schedule daily cleanup at 3 AM
+function scheduleCleanup() {
+  const now = new Date();
+  const next3AM = new Date(now);
+  next3AM.setHours(3, 0, 0, 0);
+  if (next3AM <= now) next3AM.setDate(next3AM.getDate() + 1);
+  const msUntil3AM = next3AM.getTime() - now.getTime();
+
+  setTimeout(() => {
+    runCleanup();
+    // Then every 24 hours
+    setInterval(runCleanup, 24 * 60 * 60 * 1000);
+  }, msUntil3AM);
+  console.log(`Cleanup scheduled for ${next3AM.toISOString()}`);
+}
+
+// Admin endpoint to trigger cleanup manually
+app.post("/api/cleanup", authenticateToken, authorize("admin"), async (req, res) => {
+  const { days } = req.body as { days?: number };
+  if (days) {
+    RETENTION_DAYS.transactions = days;
+    RETENTION_DAYS.audit_log = days;
+    RETENTION_DAYS.sales_logs = days;
+  }
+  await runCleanup();
+  const sizeResult = await pool.query(`SELECT pg_size_pretty(pg_database_size(current_database())) as size`);
+  res.json({ status: "cleaned", retentionDays: RETENTION_DAYS, databaseSize: sizeResult.rows[0].size });
+});
+
 // ============ START SERVER ============
 const PORT = process.env.PORT || 10000;
 initDatabase().then(() => {
+  runCleanup(); // Run once on startup
+  scheduleCleanup();
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });

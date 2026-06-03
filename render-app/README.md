@@ -109,3 +109,5 @@ render-app/
 - Stock transfers between branches
 - Analytics dashboard
 - Offline-first cart (sync on reconnect)
+- Auto-cleanup: old transactions deleted after 90 days, audit logs after 30 days
+- Database size monitoring via admin endpoint

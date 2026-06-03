@@ -98,19 +98,14 @@ export default function Layout({ children }: { children: ReactNode }) {
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Logo */}
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
-          <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center overflow-hidden">
-            {branding.logoUrl ? (
-              <img src={branding.logoUrl} alt="Logo" className="w-full h-full object-cover" />
-            ) : (
-              <Store className="w-4 h-4 text-sidebar-primary-foreground" />
-            )}
-          </div>
-          <div>
-            <p className="font-bold text-sidebar-foreground text-sm">{appName}</p>
-            <p className="text-xs text-sidebar-foreground/50">{appSub}</p>
-          </div>
-          <button className="ml-auto lg:hidden text-sidebar-foreground/50 hover:text-sidebar-foreground" onClick={() => setSidebarOpen(false)}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-sidebar-border">
+          <img
+            src="/fremon-logo.png"
+            alt="Fremon Collection"
+            className="h-12 w-auto"
+            style={{ filter: "invert(1) brightness(0.95)" }}
+          />
+          <button className="lg:hidden text-sidebar-foreground/50 hover:text-sidebar-foreground ml-2" onClick={() => setSidebarOpen(false)}>
             <X className="w-4 h-4" />
           </button>
         </div>

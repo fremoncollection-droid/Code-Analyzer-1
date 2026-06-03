@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { db, usersTable, locationsTable, categoriesTable, shelvesTable, inventoryTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -45,16 +45,23 @@ router.post("/", async (_req, res) => {
       set: { passwordHash: await bcrypt.hash("wholesale2", 10), pinHash: await bcrypt.hash("0000", 10), role: "customer", customerType: "wholesale", wholesaleTier: 2, locationId: loc1Id, updatedAt: new Date() }
     });
 
-    // Categories
-    await db.insert(categoriesTable).values([
+    // Categories — upsert by name so re-seeding always returns correct IDs
+    const catDefs = [
       { name: "Women's Wear", color: "#EC4899", description: "Ladies clothing, dresses, tops & skirts" },
       { name: "Men's Wear", color: "#3B82F6", description: "Gents clothing, shirts, trousers & suits" },
       { name: "Kids Wear", color: "#F59E0B", description: "Children's clothing for boys and girls" },
       { name: "Accessories", color: "#8B5CF6", description: "Bags, belts, scarves & fashion accessories" },
-    ]).onConflictDoNothing();
-
-    const cats = await db.select().from(categoriesTable).limit(4);
-    const catIds = cats.map(c => c.id);
+    ];
+    const catIds: string[] = [];
+    for (const def of catDefs) {
+      const [existing] = await db.select({ id: categoriesTable.id }).from(categoriesTable).where(eq(categoriesTable.name, def.name)).limit(1);
+      if (existing) {
+        catIds.push(existing.id);
+      } else {
+        const [created] = await db.insert(categoriesTable).values(def).returning({ id: categoriesTable.id });
+        catIds.push(created!.id);
+      }
+    }
 
     // Shelves
     await db.insert(shelvesTable).values({ name: "W1", zone: "Women's Section", capacity: 80 }).returning().onConflictDoNothing();

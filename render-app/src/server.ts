@@ -188,7 +188,7 @@ app.post("/api/categories", authenticateToken, async (req, res) => {
   const [row] = await db.insert(categoriesTable).values({ name, color: color ?? "#3B82F6", description }).returning();
   res.status(201).json(row);
 });
-app.patch("/api/categories/:id", authenticateToken, async (req, res) => {
+app.put("/api/categories/:id", authenticateToken, async (req, res) => {
   const { name, color, description } = req.body;
   if (!name) { res.status(400).json({ error: "name required" }); return; }
   const [row] = await db.update(categoriesTable).set({ name, color, description }).where(eq(categoriesTable.id, String(req.params.id))).returning();
@@ -788,14 +788,22 @@ app.post("/api/seed", async (_req, res) => {
     await db.insert(usersTable).values({ username: "cashier1", email: "cashier1@mirrortech.gh", passwordHash: await bcrypt.hash("cash123", 10), pinHash: await bcrypt.hash("1234", 10), role: "cashier", locationId: loc1Id, station: "Counter 1" }).onConflictDoUpdate({ target: usersTable.username, set: { passwordHash: await bcrypt.hash("cash123", 10), pinHash: await bcrypt.hash("1234", 10), role: "cashier", locationId: loc1Id, station: "Counter 1", updatedAt: new Date() } });
     await db.insert(usersTable).values({ username: "cashier2", email: "cashier2@mirrortech.gh", passwordHash: await bcrypt.hash("cash123", 10), pinHash: await bcrypt.hash("4321", 10), role: "cashier", locationId: loc2Id, station: "Counter 2" }).onConflictDoUpdate({ target: usersTable.username, set: { passwordHash: await bcrypt.hash("cash123", 10), pinHash: await bcrypt.hash("4321", 10), role: "cashier", locationId: loc2Id, station: "Counter 2", updatedAt: new Date() } });
     await db.insert(usersTable).values({ username: "manager1", email: "manager@mirrortech.gh", passwordHash: await bcrypt.hash("mgr123", 10), pinHash: await bcrypt.hash("5678", 10), role: "manager", locationId: loc1Id }).onConflictDoUpdate({ target: usersTable.username, set: { passwordHash: await bcrypt.hash("mgr123", 10), pinHash: await bcrypt.hash("5678", 10), role: "manager", locationId: loc1Id, updatedAt: new Date() } });
-    await db.insert(categoriesTable).values([
+    const catDefs = [
       { name: "Women's Wear", color: "#EC4899", description: "Ladies clothing, dresses, tops & skirts" },
       { name: "Men's Wear", color: "#3B82F6", description: "Gents clothing, shirts, trousers & suits" },
       { name: "Kids Wear", color: "#F59E0B", description: "Children's clothing for boys and girls" },
       { name: "Accessories", color: "#8B5CF6", description: "Bags, belts, scarves & fashion accessories" },
-    ]).onConflictDoNothing();
-    const cats = await db.select().from(categoriesTable).limit(4);
-    const catIds = cats.map(c => c.id);
+    ];
+    const catIds: string[] = [];
+    for (const def of catDefs) {
+      const [existing] = await db.select({ id: categoriesTable.id }).from(categoriesTable).where(eq(categoriesTable.name, def.name)).limit(1);
+      if (existing) {
+        catIds.push(existing.id);
+      } else {
+        const [created] = await db.insert(categoriesTable).values(def).returning({ id: categoriesTable.id });
+        catIds.push(created!.id);
+      }
+    }
     if (loc1Id) {
       await db.insert(inventoryTable).values([
         { name: "Women's Evening Gown", sku: "WW-GOW-001", price: "380.00", cost: "180.00", wholesalePrice1: "310.00", wholesalePrice2: "280.00", quantity: 20, minQuantity: 4, locationId: loc1Id, categoryId: catIds[0], unit: "piece" },

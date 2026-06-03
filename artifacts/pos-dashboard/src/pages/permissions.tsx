@@ -60,7 +60,7 @@ export default function PermissionsPage() {
       }
       await updatePerm.mutateAsync({ userId: selectedUser, data: body as any });
       toast({ title: "Permission updated" });
-      qc.invalidateQueries({ queryKey: ["listPermissions"] });
+      qc.invalidateQueries({ queryKey: ["/api/permissions"] });
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
@@ -72,7 +72,7 @@ export default function PermissionsPage() {
     try {
       await deletePerm.mutateAsync({ id: existing.id });
       toast({ title: "Permission removed" });
-      qc.invalidateQueries({ queryKey: ["listPermissions"] });
+      qc.invalidateQueries({ queryKey: ["/api/permissions"] });
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }

@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { nanoid } from "nanoid";
@@ -31,8 +32,17 @@ app.use((req, res, next) => {
 });
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, "../uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Serve uploaded files statically
+app.use("/uploads", express.static(uploadsDir));
 
 // Health check
 app.get("/api/healthz", async (_req, res) => {
@@ -633,6 +643,14 @@ app.get("/api/settings", authenticateToken, async (_req, res) => {
   res.json(settings);
 });
 
+app.get("/api/public/settings", async (_req, res) => {
+  const rows = await db.select().from(settingsTable);
+  const settings: Record<string, string> = {};
+  for (const row of rows) settings[row.key] = row.value;
+  if (!settings.vat_rate) settings.vat_rate = "15";
+  res.json(settings);
+});
+
 app.put("/api/settings", authenticateToken, authorize("admin"), async (req, res) => {
   for (const [key, value] of Object.entries(req.body as Record<string, string | number>)) {
     await db.insert(settingsTable).values({ key, value: String(value) }).onConflictDoUpdate({ target: settingsTable.key, set: { value: String(value), updatedAt: new Date() } });
@@ -641,6 +659,34 @@ app.put("/api/settings", authenticateToken, authorize("admin"), async (req, res)
   const settings: Record<string, string> = {};
   for (const row of rows) settings[row.key] = row.value;
   res.json(settings);
+});
+
+// ============ LOGO UPLOAD ============
+app.post("/api/upload/logo", authenticateToken, authorize("admin"), async (req, res) => {
+  try {
+    const base64Data = req.body.logo;
+    if (!base64Data || typeof base64Data !== "string") {
+      res.status(400).json({ error: "No logo data provided" });
+      return;
+    }
+    // Extract base64 data if it includes data URI scheme
+    const match = base64Data.match(/^data:image\/\w+;base64,(.+)$/);
+    const buffer = match ? Buffer.from(match[1], "base64") : Buffer.from(base64Data, "base64");
+    if (buffer.length > 5 * 1024 * 1024) {
+      res.status(400).json({ error: "Logo too large (max 5MB)" });
+      return;
+    }
+    const filename = `logo_${Date.now()}.png`;
+    const filepath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filepath, buffer);
+    const logoUrl = `/uploads/${filename}`;
+    // Save to settings
+    await db.insert(settingsTable).values({ key: "logo_url", value: logoUrl }).onConflictDoUpdate({ target: settingsTable.key, set: { value: logoUrl, updatedAt: new Date() } });
+    res.json({ logoUrl });
+  } catch (err) {
+    console.error("Logo upload error:", err);
+    res.status(500).json({ error: "Upload failed" });
+  }
 });
 
 // ============ SEED ============

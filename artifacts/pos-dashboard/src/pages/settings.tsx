@@ -642,13 +642,11 @@ export default function SettingsPage() {
                   if (!name && !logoFile) { toast({ title: "Nothing to save", variant: "destructive" }); return; }
                   try {
                     const token = localStorage.getItem("pos_token");
-                    if (logoFile) {
-                      const fd = new FormData();
-                      fd.append("logo", logoFile);
+                    if (logoFile && logoPreview) {
                       const res = await fetch("/api/upload/logo", {
                         method: "POST",
-                        headers: { Authorization: `Bearer ${token}` },
-                        body: fd,
+                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ logo: logoPreview }),
                       });
                       if (!res.ok) throw new Error("Upload failed");
                     }

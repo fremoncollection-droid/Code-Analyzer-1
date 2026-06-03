@@ -35,8 +35,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Health check
-app.get("/api/healthz", (_req, res) => {
-  res.json({ status: "ok" });
+app.get("/api/healthz", async (_req, res) => {
+  try {
+    const result = await pool.query("SELECT NOW()");
+    res.json({ status: "ok", db: "connected", timestamp: result.rows[0].now });
+  } catch {
+    res.status(503).json({ status: "error", db: "disconnected" });
+  }
 });
 
 // ============ AUTH ============

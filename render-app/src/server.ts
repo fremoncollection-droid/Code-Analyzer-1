@@ -1,0 +1,710 @@
+import express from "express";
+import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { nanoid } from "nanoid";
+import { eq, and, gte, lte, desc, count, sql } from "drizzle-orm";
+import { db } from "./db.js";
+import { authenticateToken, authorize } from "./auth.js";
+import {
+  usersTable, locationsTable, categoriesTable, unitsTable, shelvesTable,
+  inventoryTable, transactionsTable, shiftsTable, transfersTable,
+  auditLogTable, settingsTable, salesLogsTable, leadsTable, tasksTable,
+  discountRequestsTable, userPermissionsTable,
+} from "./schema.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const app = express();
+
+const JWT_SECRET = process.env.JWT_SECRET ?? "mirrortech-dev-secret";
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? "mirrortech-dev-refresh-secret";
+
+// Simple console logging (no pino, no workers)
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    console.log(`${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms`);
+  });
+  next();
+});
+
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Health check
+app.get("/api/healthz", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+// ============ AUTH ============
+const pinAttempts = new Map<string, { count: number; lockedUntil: number }>();
+
+function generateTokens(user: { id: string; username: string; email: string; role: string; locationId: string | null }) {
+  const payload = { id: user.id, username: user.username, email: user.email, role: user.role, locationId: user.locationId };
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "8h" });
+  const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
+  return { token, refreshToken };
+}
+
+app.post("/api/auth/login", async (req, res) => {
+  const { username, password } = req.body as { username?: string; password?: string };
+  if (!username || !password) {
+    res.status(400).json({ error: "username and password required" });
+    return;
+  }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.username, username)).limit(1);
+  if (!user) {
+    res.status(401).json({ error: "Invalid credentials" });
+    return;
+  }
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) {
+    res.status(401).json({ error: "Invalid credentials" });
+    return;
+  }
+  if (!user.isActive) {
+    res.status(403).json({ error: "Account is disabled" });
+    return;
+  }
+  const { token, refreshToken } = generateTokens(user);
+  res.json({
+    token, refreshToken,
+    user: { id: user.id, username: user.username, email: user.email, role: user.role, locationId: user.locationId },
+  });
+});
+
+app.post("/api/auth/refresh", async (req, res) => {
+  const { refreshToken } = req.body as { refreshToken?: string };
+  if (!refreshToken) { res.status(400).json({ error: "refreshToken required" }); return; }
+  let payload: { id: string };
+  try {
+    payload = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as { id: string };
+  } catch { res.status(401).json({ error: "Invalid refresh token" }); return; }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, payload.id)).limit(1);
+  if (!user || !user.isActive) { res.status(401).json({ error: "User not found or disabled" }); return; }
+  const tokens = generateTokens(user);
+  res.json({ ...tokens, user: { id: user.id, username: user.username, email: user.email, role: user.role, locationId: user.locationId } });
+});
+
+app.post("/api/auth/pin-login", async (req, res) => {
+  const { username, pin } = req.body as { username?: string; pin?: string };
+  if (!username || !pin) { res.status(400).json({ error: "username and pin required" }); return; }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.username, username)).limit(1);
+  if (!user) { res.status(401).json({ error: "Invalid credentials" }); return; }
+  const ip = req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || undefined;
+  const key = ip ? `${user.id}@${ip}` : user.id;
+  const record = pinAttempts.get(key);
+  if (record && record.lockedUntil > Date.now()) {
+    const mins = Math.ceil((record.lockedUntil - Date.now()) / 60000);
+    res.status(429).json({ error: `Account locked. Try again in ${mins} minute(s).` });
+    return;
+  }
+  if (!user.pinHash) { res.status(403).json({ error: "PIN not set" }); return; }
+  const valid = await bcrypt.compare(pin, user.pinHash);
+  if (!valid) {
+    const r = pinAttempts.get(key);
+    if (!r) pinAttempts.set(key, { count: 1, lockedUntil: 0 });
+    else { r.count++; if (r.count >= 3) r.lockedUntil = Date.now() + 5 * 60 * 1000; }
+    const remaining = r ? Math.max(0, 3 - r.count) : 2;
+    res.status(401).json({ error: "Invalid PIN", remainingAttempts: remaining });
+    return;
+  }
+  pinAttempts.delete(key);
+  const { token, refreshToken } = generateTokens(user);
+  res.json({ token, refreshToken, user: { id: user.id, username: user.username, email: user.email, role: user.role, locationId: user.locationId, station: user.station } });
+});
+
+app.post("/api/auth/manager-override", async (req, res) => {
+  const { username, pin } = req.body as { username?: string; pin?: string };
+  if (!username || !pin) { res.status(400).json({ error: "username and pin required" }); return; }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.username, username)).limit(1);
+  if (!user || (user.role !== "manager" && user.role !== "admin") || !user.pinHash) {
+    res.status(401).json({ error: "Invalid credentials" }); return;
+  }
+  const valid = await bcrypt.compare(pin, user.pinHash);
+  if (!valid) { res.status(401).json({ error: "Invalid PIN" }); return; }
+  const overrideToken = jwt.sign({ id: user.id, username: user.username, role: user.role, type: "override" }, JWT_SECRET, { expiresIn: "5m" });
+  res.json({ overrideToken, managerId: user.id, managerName: user.username, expiresIn: "5m" });
+});
+
+app.get("/api/auth/me", async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const token = authHeader.slice(7);
+  let payload: { id: string };
+  try { payload = jwt.verify(token, JWT_SECRET) as { id: string }; }
+  catch { res.status(401).json({ error: "Invalid token" }); return; }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, payload.id)).limit(1);
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+  res.json({ id: user.id, username: user.username, email: user.email, role: user.role, locationId: user.locationId, station: user.station });
+});
+
+// ============ LOCATIONS ============
+app.get("/api/locations", authenticateToken, async (req, res) => {
+  const rows = await db.select().from(locationsTable).where(eq(locationsTable.isActive, true));
+  res.json(rows);
+});
+app.post("/api/locations", authenticateToken, async (req, res) => {
+  const { name, address, phone } = req.body;
+  if (!name) { res.status(400).json({ error: "name required" }); return; }
+  const [row] = await db.insert(locationsTable).values({ name, address, phone }).returning();
+  res.status(201).json(row);
+});
+app.patch("/api/locations/:id", authenticateToken, async (req, res) => {
+  const [row] = await db.update(locationsTable).set(req.body).where(eq(locationsTable.id, String(req.params.id))).returning();
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(row);
+});
+
+// ============ CATEGORIES ============
+app.get("/api/categories", authenticateToken, async (_req, res) => {
+  const rows = await db.select().from(categoriesTable);
+  res.json(rows);
+});
+app.post("/api/categories", authenticateToken, async (req, res) => {
+  const { name, color, description } = req.body;
+  if (!name) { res.status(400).json({ error: "name required" }); return; }
+  const [row] = await db.insert(categoriesTable).values({ name, color: color ?? "#3B82F6", description }).returning();
+  res.status(201).json(row);
+});
+app.patch("/api/categories/:id", authenticateToken, async (req, res) => {
+  const [row] = await db.update(categoriesTable).set(req.body).where(eq(categoriesTable.id, String(req.params.id))).returning();
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(row);
+});
+
+// ============ INVENTORY ============
+app.get("/api/inventory", authenticateToken, async (req, res) => {
+  const { locationId, categoryId, search, lowStock } = req.query as Record<string, string>;
+  const user = (req as any).user;
+  let effectiveLocationId = locationId;
+  if (user.role !== "admin" && user.role !== "manager" && user.locationId) {
+    effectiveLocationId = user.locationId;
+  }
+  const conditions: any[] = [eq(inventoryTable.isActive, true)];
+  if (effectiveLocationId) conditions.push(eq(inventoryTable.locationId, effectiveLocationId));
+  if (categoryId) conditions.push(eq(inventoryTable.categoryId, categoryId));
+  if (search) {
+    conditions.push(sql`${inventoryTable.name} ILIKE ${`%${search}%`} OR ${inventoryTable.sku} ILIKE ${`%${search}%`}`);
+  }
+  if (lowStock === "true") conditions.push(lte(inventoryTable.quantity, inventoryTable.minQuantity));
+  const items = await db
+    .select({ id: inventoryTable.id, name: inventoryTable.name, sku: inventoryTable.sku, description: inventoryTable.description, price: inventoryTable.price, wholesalePrice1: inventoryTable.wholesalePrice1, wholesalePrice2: inventoryTable.wholesalePrice2, cost: inventoryTable.cost, quantity: inventoryTable.quantity, minQuantity: inventoryTable.minQuantity, locationId: inventoryTable.locationId, categoryId: inventoryTable.categoryId, categoryName: categoriesTable.name, unitId: inventoryTable.unitId, unitName: unitsTable.name, unitAbbreviation: unitsTable.abbreviation, shelfId: inventoryTable.shelfId, shelfName: shelvesTable.name, shelfZone: shelvesTable.zone, unit: inventoryTable.unit, isActive: inventoryTable.isActive, createdAt: inventoryTable.createdAt })
+    .from(inventoryTable)
+    .leftJoin(categoriesTable, eq(inventoryTable.categoryId, categoriesTable.id))
+    .leftJoin(unitsTable, eq(inventoryTable.unitId, unitsTable.id))
+    .leftJoin(shelvesTable, eq(inventoryTable.shelfId, shelvesTable.id))
+    .where(and(...conditions))
+    .orderBy(inventoryTable.name);
+  res.json(items);
+});
+app.get("/api/inventory/:id", authenticateToken, async (req, res) => {
+  const [item] = await db.select({ id: inventoryTable.id, name: inventoryTable.name, sku: inventoryTable.sku, description: inventoryTable.description, price: inventoryTable.price, wholesalePrice1: inventoryTable.wholesalePrice1, wholesalePrice2: inventoryTable.wholesalePrice2, cost: inventoryTable.cost, quantity: inventoryTable.quantity, minQuantity: inventoryTable.minQuantity, locationId: inventoryTable.locationId, categoryId: inventoryTable.categoryId, categoryName: categoriesTable.name, unit: inventoryTable.unit, isActive: inventoryTable.isActive, createdAt: inventoryTable.createdAt }).from(inventoryTable).leftJoin(categoriesTable, eq(inventoryTable.categoryId, categoriesTable.id)).where(eq(inventoryTable.id, String(req.params.id))).limit(1);
+  if (!item) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(item);
+});
+app.post("/api/inventory", authenticateToken, async (req, res) => {
+  const { name, sku, description, price, wholesalePrice1, wholesalePrice2, cost, quantity, minQuantity, locationId, categoryId, unitId, shelfId, unit } = req.body;
+  if (!name || !price) { res.status(400).json({ error: "name and price required" }); return; }
+  const [item] = await db.insert(inventoryTable).values({ name, sku, description, price, wholesalePrice1, wholesalePrice2, cost, quantity: quantity ?? 0, minQuantity: minQuantity ?? 0, locationId, categoryId, unitId, shelfId, unit: unit ?? "piece" }).returning();
+  res.status(201).json(item);
+});
+app.patch("/api/inventory/:id", authenticateToken, async (req, res) => {
+  const allowed = ["name", "sku", "description", "price", "wholesalePrice1", "wholesalePrice2", "cost", "quantity", "minQuantity", "locationId", "categoryId", "unitId", "shelfId", "unit", "isActive"];
+  const updates: Record<string, unknown> = {};
+  for (const key of allowed) if (key in req.body) updates[key] = req.body[key];
+  if (Object.keys(updates).length === 0) { res.status(400).json({ error: "No valid fields" }); return; }
+  const [item] = await db.update(inventoryTable).set(updates as any).where(eq(inventoryTable.id, String(req.params.id))).returning();
+  if (!item) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(item);
+});
+app.delete("/api/inventory/:id", authenticateToken, async (req, res) => {
+  await db.update(inventoryTable).set({ isActive: false }).where(eq(inventoryTable.id, String(req.params.id)));
+  res.status(204).send();
+});
+
+// ============ TRANSACTIONS ============
+function generateReceiptNumber() {
+  const now = new Date();
+  const datePart = now.toISOString().slice(0, 10).replace(/-/g, "");
+  return `MTR-${datePart}-${nanoid(6).toUpperCase()}`;
+}
+
+app.post("/api/transactions/sync", authenticateToken, async (req, res) => {
+  const { transactions } = req.body as { transactions?: unknown[] };
+  if (!Array.isArray(transactions)) { res.status(400).json({ error: "transactions array required" }); return; }
+  const cashierId = (req as any).user.id;
+  let synced = 0; const errors: string[] = [];
+  for (const tx of transactions) {
+    try {
+      const t = tx as any;
+      await db.insert(transactionsTable).values({
+        receiptNumber: generateReceiptNumber(), locationId: t.locationId, cashierId, items: t.items,
+        subtotal: String(t.subtotal), taxAmount: String(t.taxAmount), total: String(t.total),
+        paymentMethod: t.paymentMethod ?? "cash", paymentStatus: "completed", momoPhone: t.momoPhone,
+        momoNetwork: t.momoNetwork, momoReference: t.momoReference, customerName: t.customerName,
+        customerPhone: t.customerPhone, notes: t.notes, synced: true,
+      });
+      synced++;
+    } catch (e: any) { errors.push(e.message); }
+  }
+  res.json({ synced, failed: errors.length, errors });
+});
+
+app.get("/api/transactions", authenticateToken, async (req, res) => {
+  const { locationId, startDate, endDate, paymentMethod, salesMode, limit = "50", offset = "0" } = req.query as Record<string, string>;
+  const user = (req as any).user;
+  let effectiveLocationId = locationId;
+  if (user.role !== "admin" && user.role !== "manager" && user.locationId) effectiveLocationId = user.locationId;
+  const conditions: any[] = [eq(transactionsTable.isVoided, false)];
+  if (effectiveLocationId) conditions.push(eq(transactionsTable.locationId, effectiveLocationId));
+  if (startDate) conditions.push(gte(transactionsTable.createdAt, new Date(startDate)));
+  if (endDate) conditions.push(lte(transactionsTable.createdAt, new Date(endDate)));
+  if (paymentMethod) conditions.push(eq(transactionsTable.paymentMethod, paymentMethod));
+  if (salesMode) conditions.push(eq(transactionsTable.salesMode, salesMode));
+  const [{ total }] = await db.select({ total: count() }).from(transactionsTable).where(and(...conditions));
+  const data = await db.select({ id: transactionsTable.id, receiptNumber: transactionsTable.receiptNumber, locationId: transactionsTable.locationId, locationName: locationsTable.name, cashierId: transactionsTable.cashierId, cashierName: usersTable.username, items: transactionsTable.items, subtotal: transactionsTable.subtotal, taxAmount: transactionsTable.taxAmount, taxBreakdown: transactionsTable.taxBreakdown, total: transactionsTable.total, paymentMethod: transactionsTable.paymentMethod, paymentStatus: transactionsTable.paymentStatus, momoPhone: transactionsTable.momoPhone, momoNetwork: transactionsTable.momoNetwork, momoReference: transactionsTable.momoReference, salesMode: transactionsTable.salesMode, wholesaleTier: transactionsTable.wholesaleTier, customerId: transactionsTable.customerId, customerName: transactionsTable.customerName, customerPhone: transactionsTable.customerPhone, notes: transactionsTable.notes, isVoided: transactionsTable.isVoided, voidReason: transactionsTable.voidReason, createdAt: transactionsTable.createdAt }).from(transactionsTable).leftJoin(locationsTable, eq(transactionsTable.locationId, locationsTable.id)).leftJoin(usersTable, eq(transactionsTable.cashierId, usersTable.id)).where(and(...conditions)).orderBy(desc(transactionsTable.createdAt)).limit(parseInt(limit)).offset(parseInt(offset));
+  res.json({ data, total });
+});
+
+app.post("/api/transactions", authenticateToken, async (req, res) => {
+  const { locationId, items, subtotal, taxAmount, taxBreakdown, total, paymentMethod, momoPhone, momoNetwork, momoReference, customerId, customerName, customerPhone, notes, shiftId, salesMode, wholesaleTier } = req.body;
+  if (!locationId || !items || !subtotal || !total || !paymentMethod) { res.status(400).json({ error: "locationId, items, subtotal, total, paymentMethod required" }); return; }
+  const receiptNumber = generateReceiptNumber();
+  const cashierId = (req as any).user.id;
+  const sm = salesMode === "wholesale" ? "wholesale" : "retail";
+  const [tx] = await db.insert(transactionsTable).values({ receiptNumber, locationId, cashierId, shiftId: shiftId ?? null, items, subtotal, taxAmount: taxAmount ?? "0", taxBreakdown: taxBreakdown ?? null, total, paymentMethod, paymentStatus: paymentMethod === "momo" ? "pending" : "completed", salesMode: sm, wholesaleTier: wholesaleTier ?? null, customerId: customerId ?? null, momoPhone, momoNetwork, momoReference, customerName, customerPhone, notes }).returning();
+  for (const item of items) {
+    if (item.itemId) await db.execute(sql`UPDATE inventory SET quantity = GREATEST(0, quantity - ${item.quantity}) WHERE id = ${item.itemId}`);
+  }
+  for (const item of items) {
+    await db.insert(salesLogsTable).values({ salespersonId: cashierId, salesMode: sm, action: "sale_item", details: `Sold ${item.quantity} x ${item.name}`, productId: item.itemId, orderId: tx.id, quantity: item.quantity, unitPrice: item.price, total: item.total });
+  }
+  res.status(201).json(tx);
+});
+
+app.get("/api/transactions/:id", authenticateToken, async (req, res) => {
+  const [tx] = await db.select({ id: transactionsTable.id, receiptNumber: transactionsTable.receiptNumber, locationId: transactionsTable.locationId, locationName: locationsTable.name, cashierId: transactionsTable.cashierId, cashierName: usersTable.username, items: transactionsTable.items, subtotal: transactionsTable.subtotal, taxAmount: transactionsTable.taxAmount, taxBreakdown: transactionsTable.taxBreakdown, total: transactionsTable.total, paymentMethod: transactionsTable.paymentMethod, paymentStatus: transactionsTable.paymentStatus, momoPhone: transactionsTable.momoPhone, momoNetwork: transactionsTable.momoNetwork, momoReference: transactionsTable.momoReference, customerName: transactionsTable.customerName, customerPhone: transactionsTable.customerPhone, notes: transactionsTable.notes, isVoided: transactionsTable.isVoided, voidReason: transactionsTable.voidReason, createdAt: transactionsTable.createdAt }).from(transactionsTable).leftJoin(locationsTable, eq(transactionsTable.locationId, locationsTable.id)).leftJoin(usersTable, eq(transactionsTable.cashierId, usersTable.id)).where(eq(transactionsTable.id, String(req.params.id))).limit(1);
+  if (!tx) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(tx);
+});
+
+app.post("/api/transactions/:id/void", authenticateToken, async (req, res) => {
+  const { reason, overrideToken } = req.body as { reason?: string; overrideToken?: string };
+  if (!reason) { res.status(400).json({ error: "reason required" }); return; }
+  const user = (req as any).user;
+  let approvedBy: string | null = null;
+  if (user.role === "cashier") {
+    if (!overrideToken) { res.status(403).json({ error: "Manager override required" }); return; }
+    try {
+      const payload = jwt.verify(overrideToken, JWT_SECRET) as any;
+      if (payload.type !== "override" || (payload.role !== "manager" && payload.role !== "admin")) { res.status(403).json({ error: "Invalid override" }); return; }
+      approvedBy = payload.id;
+    } catch { res.status(403).json({ error: "Invalid override token" }); return; }
+  }
+  const [tx] = await db.update(transactionsTable).set({ isVoided: true, voidReason: reason, approvedBy: approvedBy ?? null }).where(eq(transactionsTable.id, String(req.params.id))).returning();
+  if (!tx) { res.status(404).json({ error: "Not found" }); return; }
+  const ip = req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || undefined;
+  await db.insert(auditLogTable).values({ userId: user.id, action: "void", tableName: "transactions", recordId: tx.id, oldValues: { isVoided: false }, newValues: { isVoided: true, voidReason: reason }, approvedBy: approvedBy ?? null, ipAddress: ip ?? null, userAgent: req.headers["user-agent"] ?? null });
+  res.json(tx);
+});
+
+app.get("/api/transactions/:id/receipt", authenticateToken, async (req, res) => {
+  const [tx] = await db.select({ id: transactionsTable.id, receiptNumber: transactionsTable.receiptNumber, locationId: transactionsTable.locationId, locationName: locationsTable.name, cashierId: transactionsTable.cashierId, cashierName: usersTable.username, items: transactionsTable.items, subtotal: transactionsTable.subtotal, taxAmount: transactionsTable.taxAmount, total: transactionsTable.total, paymentMethod: transactionsTable.paymentMethod, paymentStatus: transactionsTable.paymentStatus, momoPhone: transactionsTable.momoPhone, momoNetwork: transactionsTable.momoNetwork, momoReference: transactionsTable.momoReference, customerName: transactionsTable.customerName, customerPhone: transactionsTable.customerPhone, notes: transactionsTable.notes, isVoided: transactionsTable.isVoided, voidReason: transactionsTable.voidReason, createdAt: transactionsTable.createdAt }).from(transactionsTable).leftJoin(locationsTable, eq(transactionsTable.locationId, locationsTable.id)).leftJoin(usersTable, eq(transactionsTable.cashierId, usersTable.id)).where(eq(transactionsTable.id, String(req.params.id))).limit(1);
+  if (!tx) { res.status(404).json({ error: "Not found" }); return; }
+  const [location] = await db.select().from(locationsTable).where(eq(locationsTable.id, tx.locationId)).limit(1);
+  res.json({ transaction: tx, location: location ?? { id: tx.locationId, name: tx.locationName ?? "MirrorTech", address: null, phone: null, isActive: true }, graReceiptNumber: `GRA-${tx.receiptNumber}`, qrCode: null });
+});
+
+// ============ ANALYTICS ============
+function getPeriodStart(period = "today"): Date {
+  const now = new Date();
+  switch (period) {
+    case "week": { const d = new Date(now); d.setDate(d.getDate() - 7); return d; }
+    case "month": { const d = new Date(now); d.setDate(1); d.setHours(0, 0, 0, 0); return d; }
+    case "year": { const d = new Date(now); d.setMonth(0, 1); d.setHours(0, 0, 0, 0); return d; }
+    default: { const d = new Date(now); d.setHours(0, 0, 0, 0); return d; }
+  }
+}
+
+app.get("/api/analytics/summary", authenticateToken, async (req, res) => {
+  const { locationId, period = "today" } = req.query as Record<string, string>;
+  const user = (req as any).user;
+  let effectiveLocationId = locationId;
+  if (user.role !== "admin" && user.role !== "manager" && user.locationId) effectiveLocationId = user.locationId;
+  const startDate = getPeriodStart(period);
+  const conditions: any[] = [eq(transactionsTable.isVoided, false), gte(transactionsTable.createdAt, startDate)];
+  if (effectiveLocationId) conditions.push(eq(transactionsTable.locationId, effectiveLocationId));
+  const [summary] = await db.select({ totalRevenue: sql<string>`COALESCE(SUM(${transactionsTable.total}), 0)`, totalTransactions: count(), cashSales: sql<string>`COALESCE(SUM(CASE WHEN ${transactionsTable.paymentMethod} = 'cash' THEN ${transactionsTable.total} ELSE 0 END), 0)`, momoSales: sql<string>`COALESCE(SUM(CASE WHEN ${transactionsTable.paymentMethod} = 'momo' THEN ${transactionsTable.total} ELSE 0 END), 0)`, cardSales: sql<string>`COALESCE(SUM(CASE WHEN ${transactionsTable.paymentMethod} = 'card' THEN ${transactionsTable.total} ELSE 0 END), 0)`, net30Sales: sql<string>`COALESCE(SUM(CASE WHEN ${transactionsTable.paymentMethod} = 'net30' THEN ${transactionsTable.total} ELSE 0 END), 0)`, poSales: sql<string>`COALESCE(SUM(CASE WHEN ${transactionsTable.paymentMethod} = 'purchase_order' THEN ${transactionsTable.total} ELSE 0 END), 0)`, retailSales: sql<string>`COALESCE(SUM(CASE WHEN ${transactionsTable.salesMode} = 'retail' THEN ${transactionsTable.total} ELSE 0 END), 0)`, wholesaleSales: sql<string>`COALESCE(SUM(CASE WHEN ${transactionsTable.salesMode} = 'wholesale' THEN ${transactionsTable.total} ELSE 0 END), 0)` }).from(transactionsTable).where(and(...conditions));
+  const [{ lowStockItems }] = await db.select({ lowStockItems: count() }).from(inventoryTable).where(and(eq(inventoryTable.isActive, true), sql`${inventoryTable.quantity} <= ${inventoryTable.minQuantity}`));
+  const totalRevenue = parseFloat(summary.totalRevenue ?? "0");
+  const totalTx = summary.totalTransactions ?? 0;
+  res.json({ totalSales: totalRevenue, totalRevenue: totalRevenue.toFixed(2), totalTransactions: totalTx, averageOrderValue: totalTx > 0 ? (totalRevenue / totalTx).toFixed(2) : "0.00", cashSales: parseFloat(summary.cashSales ?? "0").toFixed(2), momoSales: parseFloat(summary.momoSales ?? "0").toFixed(2), cardSales: parseFloat(summary.cardSales ?? "0").toFixed(2), net30Sales: parseFloat(summary.net30Sales ?? "0").toFixed(2), poSales: parseFloat(summary.poSales ?? "0").toFixed(2), retailSales: parseFloat(summary.retailSales ?? "0").toFixed(2), wholesaleSales: parseFloat(summary.wholesaleSales ?? "0").toFixed(2), lowStockItems: lowStockItems ?? 0 });
+});
+
+app.get("/api/analytics/sales-by-day", authenticateToken, async (req, res) => {
+  const { locationId, days = "7" } = req.query as Record<string, string>;
+  const user = (req as any).user;
+  let effectiveLocationId = locationId;
+  if (user.role !== "admin" && user.role !== "manager" && user.locationId) effectiveLocationId = user.locationId;
+  const startDate = new Date(); startDate.setDate(startDate.getDate() - parseInt(days)); startDate.setHours(0, 0, 0, 0);
+  const conditions: any[] = [eq(transactionsTable.isVoided, false), gte(transactionsTable.createdAt, startDate)];
+  if (effectiveLocationId) conditions.push(eq(transactionsTable.locationId, effectiveLocationId));
+  const rows = await db.select({ date: sql<string>`DATE(${transactionsTable.createdAt})`, revenue: sql<string>`COALESCE(SUM(${transactionsTable.total}), 0)`, transactions: count() }).from(transactionsTable).where(and(...conditions)).groupBy(sql`DATE(${transactionsTable.createdAt})`).orderBy(sql`DATE(${transactionsTable.createdAt})`);
+  res.json(rows.map(r => ({ date: r.date, revenue: parseFloat(r.revenue).toFixed(2), transactions: r.transactions })));
+});
+
+app.get("/api/analytics/top-items", authenticateToken, async (req, res) => {
+  const { locationId, limit = "10" } = req.query as Record<string, string>;
+  const user = (req as any).user;
+  let effectiveLocationId = locationId;
+  if (user.role !== "admin" && user.role !== "manager" && user.locationId) effectiveLocationId = user.locationId;
+  const conditions: any[] = [eq(transactionsTable.isVoided, false)];
+  if (effectiveLocationId) conditions.push(eq(transactionsTable.locationId, effectiveLocationId));
+  const rows = await db.select({ items: transactionsTable.items }).from(transactionsTable).where(and(...conditions)).limit(500);
+  const totals: Record<string, { name: string; qty: number; revenue: number }> = {};
+  for (const row of rows) {
+    const items = Array.isArray(row.items) ? row.items : [];
+    for (const item of items as any[]) {
+      const key = item.itemId ?? item.name;
+      if (!totals[key]) totals[key] = { name: item.name, qty: 0, revenue: 0 };
+      totals[key].qty += item.quantity ?? 1;
+      totals[key].revenue += parseFloat(item.total ?? item.price ?? "0") * (item.quantity ?? 1);
+    }
+  }
+  const sorted = Object.entries(totals).sort((a, b) => b[1].qty - a[1].qty).slice(0, parseInt(limit)).map(([itemId, v]) => ({ itemId, name: v.name, quantitySold: v.qty, revenue: v.revenue.toFixed(2) }));
+  res.json(sorted);
+});
+
+// ============ LEADS ============
+app.get("/api/leads", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const { status, search, locationId } = req.query as Record<string, string>;
+  const conditions: any[] = [];
+  if (user.role === "cashier") conditions.push(eq(leadsTable.assignedTo, user.id));
+  else if (user.role === "manager" && user.locationId) conditions.push(eq(leadsTable.locationId, user.locationId));
+  if (status) conditions.push(eq(leadsTable.status, status));
+  if (locationId) conditions.push(eq(leadsTable.locationId, locationId));
+  if (search) conditions.push(sql`${leadsTable.name} ILIKE ${`%${search}%`} OR ${leadsTable.phone} ILIKE ${`%${search}%`}`);
+  const leads = await db.select({ id: leadsTable.id, name: leadsTable.name, phone: leadsTable.phone, email: leadsTable.email, status: leadsTable.status, source: leadsTable.source, notes: leadsTable.notes, estimatedValue: leadsTable.estimatedValue, assignedTo: leadsTable.assignedTo, locationId: leadsTable.locationId, lastContactedAt: leadsTable.lastContactedAt, createdAt: leadsTable.createdAt }).from(leadsTable).where(conditions.length > 0 ? and(...conditions) : undefined).orderBy(leadsTable.createdAt);
+  res.json(leads);
+});
+
+app.get("/api/leads/pipeline/summary", authenticateToken, authorize("manager", "admin"), async (req, res) => {
+  const user = (req as any).user;
+  const conditions: any[] = [];
+  if (user.role === "manager" && user.locationId) conditions.push(eq(leadsTable.locationId, user.locationId));
+  const results = await db.select({ status: leadsTable.status, count: sql<number>`COUNT(*)::int` }).from(leadsTable).where(conditions.length > 0 ? and(...conditions) : undefined).groupBy(leadsTable.status);
+  res.json(results);
+});
+
+app.post("/api/leads", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const { name, phone, email, status, source, notes, estimatedValue, assignedTo, locationId } = req.body;
+  if (!name) { res.status(400).json({ error: "Name is required" }); return; }
+  let a = assignedTo; let l = locationId;
+  if (user.role === "cashier") { a = user.id; l = user.locationId ?? l; }
+  else if (user.role === "manager" && !a && !l) { l = user.locationId; }
+  const [lead] = await db.insert(leadsTable).values({ name, phone, email, status: status ?? "new", source: source ?? "walk-in", notes, estimatedValue, assignedTo: a, locationId: l }).returning();
+  res.status(201).json(lead);
+});
+
+app.patch("/api/leads/:id", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const [existing] = await db.select({ assignedTo: leadsTable.assignedTo, locationId: leadsTable.locationId }).from(leadsTable).where(eq(leadsTable.id, String(req.params.id))).limit(1);
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (user.role === "cashier" && existing.assignedTo !== user.id) { res.status(403).json({ error: "Not yours" }); return; }
+  if (user.role === "manager" && existing.locationId !== user.locationId) { res.status(403).json({ error: "Not your location" }); return; }
+  const allowed = ["name", "phone", "email", "status", "source", "notes", "estimatedValue", "assignedTo", "locationId", "lastContactedAt"];
+  const updates: Record<string, unknown> = {};
+  for (const key of allowed) if (key in req.body) updates[key] = req.body[key];
+  const [updated] = await db.update(leadsTable).set(updates as any).where(eq(leadsTable.id, String(req.params.id))).returning();
+  res.json(updated);
+});
+
+app.delete("/api/leads/:id", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const [existing] = await db.select({ assignedTo: leadsTable.assignedTo, locationId: leadsTable.locationId }).from(leadsTable).where(eq(leadsTable.id, String(req.params.id))).limit(1);
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (user.role === "cashier" && existing.assignedTo !== user.id) { res.status(403).json({ error: "Not yours" }); return; }
+  if (user.role === "manager" && existing.locationId !== user.locationId) { res.status(403).json({ error: "Not your location" }); return; }
+  await db.delete(leadsTable).where(eq(leadsTable.id, String(req.params.id)));
+  res.status(204).send();
+});
+
+// ============ TASKS ============
+app.get("/api/tasks", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const conditions: any[] = [];
+  if (user.role === "cashier") conditions.push(eq(tasksTable.userId, user.id));
+  else if (user.role === "manager" && user.locationId) {
+    const cashiers = await db.select({ id: usersTable.id }).from(usersTable).where(and(eq(usersTable.role, "cashier"), eq(usersTable.locationId, user.locationId)));
+    const ids = cashiers.map(c => c.id); ids.push(user.id);
+    conditions.push(sql`${tasksTable.userId} IN (${ids.map(id => `'${id}'`).join(",")})`);
+  }
+  const rows = await db.select({ id: tasksTable.id, userId: tasksTable.userId, title: tasksTable.title, description: tasksTable.description, type: tasksTable.type, dueDate: tasksTable.dueDate, priority: tasksTable.priority, completed: tasksTable.completed, completedAt: tasksTable.completedAt, createdAt: tasksTable.createdAt, username: usersTable.username }).from(tasksTable).leftJoin(usersTable, eq(tasksTable.userId, usersTable.id)).where(conditions.length > 0 ? and(...conditions) : undefined).orderBy(tasksTable.dueDate);
+  res.json(rows);
+});
+
+app.post("/api/tasks", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const { title, description, type, dueDate, priority } = req.body;
+  if (!title || !dueDate) { res.status(400).json({ error: "title and dueDate required" }); return; }
+  const [task] = await db.insert(tasksTable).values({ userId: user.id, title, description, type: type ?? "call", dueDate: new Date(dueDate), priority: priority ?? "medium" }).returning();
+  res.status(201).json(task);
+});
+
+app.patch("/api/tasks/:id", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const [existing] = await db.select({ userId: tasksTable.userId }).from(tasksTable).where(eq(tasksTable.id, String(req.params.id))).limit(1);
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (user.role === "cashier" && existing.userId !== user.id) { res.status(403).json({ error: "Not yours" }); return; }
+  const allowed = ["title", "description", "type", "dueDate", "priority", "completed"];
+  const updates: Record<string, unknown> = {};
+  for (const key of allowed) if (key in req.body) updates[key] = req.body[key];
+  if (updates.completed === true) updates.completedAt = new Date();
+  const [updated] = await db.update(tasksTable).set(updates as any).where(eq(tasksTable.id, String(req.params.id))).returning();
+  res.json(updated);
+});
+
+// ============ DISCOUNT REQUESTS ============
+app.get("/api/discount-requests", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const conditions: any[] = [];
+  if (user.role === "cashier") conditions.push(eq(discountRequestsTable.requestedBy, user.id));
+  const rows = await db.select({ id: discountRequestsTable.id, transactionId: discountRequestsTable.transactionId, customerName: discountRequestsTable.customerName, requestedAmount: discountRequestsTable.requestedAmount, originalAmount: discountRequestsTable.originalAmount, reason: discountRequestsTable.reason, status: discountRequestsTable.status, requestedBy: discountRequestsTable.requestedBy, requesterName: usersTable.username, approvedBy: discountRequestsTable.approvedBy, approvedAt: discountRequestsTable.approvedAt, rejectionReason: discountRequestsTable.rejectionReason, createdAt: discountRequestsTable.createdAt }).from(discountRequestsTable).leftJoin(usersTable, eq(discountRequestsTable.requestedBy, usersTable.id)).where(conditions.length > 0 ? and(...conditions) : undefined).orderBy(desc(discountRequestsTable.createdAt));
+  res.json(rows);
+});
+
+app.post("/api/discount-requests", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const { requestedAmount, originalAmount, reason, customerName } = req.body;
+  if (!requestedAmount || !originalAmount || !reason) { res.status(400).json({ error: "requestedAmount, originalAmount, reason required" }); return; }
+  const [req2] = await db.insert(discountRequestsTable).values({ requestedAmount, originalAmount, reason, customerName, requestedBy: user.id, status: "pending" }).returning();
+  res.status(201).json(req2);
+});
+
+app.post("/api/discount-requests/:id/approve", authenticateToken, authorize("manager", "admin"), async (req, res) => {
+  const [updated] = await db.update(discountRequestsTable).set({ status: "approved", approvedBy: (req as any).user.id, approvedAt: new Date() }).where(eq(discountRequestsTable.id, String(req.params.id))).returning();
+  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(updated);
+});
+
+app.post("/api/discount-requests/:id/reject", authenticateToken, authorize("manager", "admin"), async (req, res) => {
+  const { reason } = req.body as { reason?: string };
+  const [updated] = await db.update(discountRequestsTable).set({ status: "rejected", approvedBy: (req as any).user.id, rejectionReason: reason ?? null }).where(eq(discountRequestsTable.id, String(req.params.id))).returning();
+  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(updated);
+});
+
+// ============ PERMISSIONS ============
+app.get("/api/permissions", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const { userId } = req.query as Record<string, string>;
+  const conditions: any[] = [];
+  if (user.role === "admin") { if (userId) conditions.push(eq(userPermissionsTable.userId, userId)); }
+  else conditions.push(eq(userPermissionsTable.userId, user.id));
+  const perms = await db.select({ id: userPermissionsTable.id, userId: userPermissionsTable.userId, module: userPermissionsTable.module, canView: userPermissionsTable.canView, canCreate: userPermissionsTable.canCreate, canEdit: userPermissionsTable.canEdit, canDelete: userPermissionsTable.canDelete, canApprove: userPermissionsTable.canApprove }).from(userPermissionsTable).where(conditions.length > 0 ? and(...conditions) : undefined).orderBy(userPermissionsTable.module);
+  res.json(perms);
+});
+
+app.put("/api/permissions/:userId", authenticateToken, authorize("admin"), async (req, res) => {
+  const targetId = String(req.params.userId);
+  const { module, canView, canCreate, canEdit, canDelete, canApprove } = req.body;
+  if (!module) { res.status(400).json({ error: "module is required" }); return; }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, targetId)).limit(1);
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+  const [perm] = await db.insert(userPermissionsTable).values({ userId: targetId, module, canView: canView ?? false, canCreate: canCreate ?? false, canEdit: canEdit ?? false, canDelete: canDelete ?? false, canApprove: canApprove ?? false }).onConflictDoUpdate({ target: [userPermissionsTable.userId, userPermissionsTable.module], set: { canView: canView ?? false, canCreate: canCreate ?? false, canEdit: canEdit ?? false, canDelete: canDelete ?? false, canApprove: canApprove ?? false, updatedAt: new Date() } }).returning();
+  res.json(perm);
+});
+
+app.delete("/api/permissions/:id", authenticateToken, authorize("admin"), async (req, res) => {
+  await db.delete(userPermissionsTable).where(eq(userPermissionsTable.id, String(req.params.id)));
+  res.status(204).send();
+});
+
+// ============ USERS ============
+app.get("/api/users", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const { role, search } = req.query as Record<string, string>;
+  const conditions: any[] = [eq(usersTable.isActive, true)];
+  if (role) conditions.push(eq(usersTable.role, role));
+  if (search) conditions.push(sql`${usersTable.username} ILIKE ${`%${search}%`}`);
+  if (user.role === "manager" && user.locationId) conditions.push(eq(usersTable.locationId, user.locationId));
+  const rows = await db.select({ id: usersTable.id, username: usersTable.username, email: usersTable.email, role: usersTable.role, locationId: usersTable.locationId, station: usersTable.station, customerType: usersTable.customerType, wholesaleTier: usersTable.wholesaleTier, monthlyTarget: usersTable.monthlyTarget, isActive: usersTable.isActive }).from(usersTable).where(and(...conditions));
+  res.json(rows);
+});
+
+app.post("/api/users", authenticateToken, async (req, res) => {
+  const { username, email, password, role, locationId, station, monthlyTarget } = req.body;
+  if (!username || !email || !password) { res.status(400).json({ error: "username, email, password required" }); return; }
+  const passwordHash = await bcrypt.hash(password, 10);
+  const [user] = await db.insert(usersTable).values({ username, email, passwordHash, role: role ?? "cashier", locationId, station, monthlyTarget: monthlyTarget ?? null }).returning();
+  res.status(201).json({ id: user.id, username: user.username, email: user.email, role: user.role, locationId: user.locationId, station: user.station });
+});
+
+app.patch("/api/users/:id", authenticateToken, async (req, res) => {
+  const allowed = ["username", "email", "role", "locationId", "station", "monthlyTarget", "isActive", "customerType", "wholesaleTier"];
+  const updates: Record<string, unknown> = {};
+  for (const key of allowed) if (key in req.body) updates[key] = req.body[key];
+  if (req.body.password) updates.passwordHash = await bcrypt.hash(req.body.password, 10);
+  const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, String(req.params.id))).returning();
+  if (!user) { res.status(404).json({ error: "Not found" }); return; }
+  res.json({ id: user.id, username: user.username, email: user.email, role: user.role, locationId: user.locationId, station: user.station });
+});
+
+app.delete("/api/users/:id", authenticateToken, async (req, res) => {
+  await db.update(usersTable).set({ isActive: false }).where(eq(usersTable.id, String(req.params.id)));
+  res.status(204).send();
+});
+
+// ============ SHIFTS ============
+app.get("/api/shifts", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const { locationId, status } = req.query as Record<string, string>;
+  let effectiveLocationId = locationId;
+  if (user.role !== "admin" && user.role !== "manager" && user.locationId) effectiveLocationId = user.locationId;
+  const conditions: any[] = [];
+  if (effectiveLocationId) conditions.push(eq(shiftsTable.locationId, effectiveLocationId));
+  if (status) conditions.push(eq(shiftsTable.status, status));
+  const rows = await db.select({ id: shiftsTable.id, userId: shiftsTable.userId, username: usersTable.username, locationId: shiftsTable.locationId, locationName: locationsTable.name, startTime: shiftsTable.startTime, endTime: shiftsTable.endTime, status: shiftsTable.status, openingFloat: shiftsTable.openingFloat, closingFloat: shiftsTable.closingFloat, expectedCash: shiftsTable.expectedCash, expectedMoMo: shiftsTable.expectedMoMo, expectedCard: shiftsTable.expectedCard, actualCash: shiftsTable.actualCash, actualMoMo: shiftsTable.actualMoMo, actualCard: shiftsTable.actualCard, varianceCash: shiftsTable.varianceCash, varianceMoMo: shiftsTable.varianceMoMo, varianceCard: shiftsTable.varianceCard, notes: shiftsTable.notes, createdAt: shiftsTable.createdAt }).from(shiftsTable).leftJoin(usersTable, eq(shiftsTable.userId, usersTable.id)).leftJoin(locationsTable, eq(shiftsTable.locationId, locationsTable.id)).where(conditions.length > 0 ? and(...conditions) : undefined).orderBy(desc(shiftsTable.startTime));
+  res.json(rows);
+});
+
+app.post("/api/shifts", authenticateToken, async (req, res) => {
+  const { userId, locationId, startTime, endTime, status, openingFloat } = req.body;
+  if (!userId || !locationId || !startTime) { res.status(400).json({ error: "userId, locationId, startTime required" }); return; }
+  const [shift] = await db.insert(shiftsTable).values({ userId, locationId, startTime: new Date(startTime), endTime: endTime ? new Date(endTime) : null, status: status ?? "scheduled", openingFloat }).returning();
+  res.status(201).json(shift);
+});
+
+app.patch("/api/shifts/:id", authenticateToken, async (req, res) => {
+  const allowed = ["startTime", "endTime", "status", "openingFloat", "closingFloat", "expectedCash", "expectedMoMo", "expectedCard", "actualCash", "actualMoMo", "actualCard", "varianceCash", "varianceMoMo", "varianceCard", "notes"];
+  const updates: Record<string, unknown> = {};
+  for (const key of allowed) if (key in req.body) updates[key] = req.body[key];
+  const [shift] = await db.update(shiftsTable).set(updates).where(eq(shiftsTable.id, String(req.params.id))).returning();
+  if (!shift) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(shift);
+});
+
+// ============ TRANSFERS ============
+app.get("/api/transfers", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  const { status, locationId } = req.query as Record<string, string>;
+  const conditions: any[] = [];
+  if (status) conditions.push(eq(transfersTable.status, status));
+  if (locationId) {
+    conditions.push(sql`${transfersTable.fromLocationId} = ${locationId} OR ${transfersTable.toLocationId} = ${locationId}`);
+  }
+  if (user.role === "manager" && user.locationId) {
+    conditions.push(sql`${transfersTable.fromLocationId} = ${user.locationId} OR ${transfersTable.toLocationId} = ${user.locationId}`);
+  }
+  const rows = await db.select({ id: transfersTable.id, itemId: transfersTable.itemId, itemName: inventoryTable.name, fromLocationId: transfersTable.fromLocationId, fromLocationName: locationsTable.name, toLocationId: transfersTable.toLocationId, toLocationName: locationsTable.name, quantity: transfersTable.quantity, status: transfersTable.status, notes: transfersTable.notes, requestedById: transfersTable.requestedById, requestedByName: usersTable.username, approvedById: transfersTable.approvedById, approvedByName: usersTable.username, createdAt: transfersTable.createdAt }).from(transfersTable).leftJoin(inventoryTable, eq(transfersTable.itemId, inventoryTable.id)).leftJoin(locationsTable, eq(transfersTable.fromLocationId, locationsTable.id)).leftJoin(usersTable, eq(transfersTable.requestedById, usersTable.id)).where(conditions.length > 0 ? and(...conditions) : undefined).orderBy(desc(transfersTable.createdAt));
+  res.json(rows);
+});
+
+app.post("/api/transfers", authenticateToken, async (req, res) => {
+  const { itemId, fromLocationId, toLocationId, quantity, notes } = req.body;
+  if (!itemId || !fromLocationId || !toLocationId || !quantity) { res.status(400).json({ error: "itemId, fromLocationId, toLocationId, quantity required" }); return; }
+  const [transfer] = await db.insert(transfersTable).values({ itemId, fromLocationId, toLocationId, quantity, notes, requestedById: (req as any).user.id, status: "pending" }).returning();
+  res.status(201).json(transfer);
+});
+
+app.post("/api/transfers/:id/approve", authenticateToken, authorize("manager", "admin"), async (req, res) => {
+  const [transfer] = await db.update(transfersTable).set({ status: "approved", approvedById: (req as any).user.id }).where(eq(transfersTable.id, String(req.params.id))).returning();
+  if (!transfer) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(transfer);
+});
+
+// ============ SETTINGS ============
+app.get("/api/settings", authenticateToken, async (_req, res) => {
+  const rows = await db.select().from(settingsTable);
+  const settings: Record<string, string> = {};
+  for (const row of rows) settings[row.key] = row.value;
+  if (!settings.vat_rate) settings.vat_rate = "15";
+  res.json(settings);
+});
+
+app.put("/api/settings", authenticateToken, authorize("admin"), async (req, res) => {
+  for (const [key, value] of Object.entries(req.body as Record<string, string | number>)) {
+    await db.insert(settingsTable).values({ key, value: String(value) }).onConflictDoUpdate({ target: settingsTable.key, set: { value: String(value), updatedAt: new Date() } });
+  }
+  const rows = await db.select().from(settingsTable);
+  const settings: Record<string, string> = {};
+  for (const row of rows) settings[row.key] = row.value;
+  res.json(settings);
+});
+
+// ============ SEED ============
+app.post("/api/seed", async (_req, res) => {
+  try {
+    const [loc1] = await db.insert(locationsTable).values({ name: "MirrorTech - Accra Central", address: "123 High Street, Accra", phone: "+233201234567" }).returning().onConflictDoNothing() as any;
+    const [loc2] = await db.insert(locationsTable).values({ name: "MirrorTech - Kumasi Branch", address: "45 Market Circle, Kumasi", phone: "+233244567890" }).returning().onConflictDoNothing() as any;
+    const locs = await db.select().from(locationsTable).limit(2);
+    const loc1Id = locs[0]?.id; const loc2Id = locs[1]?.id ?? locs[0]?.id;
+    const ph = await bcrypt.hash("admin123", 10);
+    const p = await bcrypt.hash("1234", 10);
+    await db.insert(usersTable).values({ username: "admin", email: "admin@mirrortech.gh", passwordHash: ph, pinHash: p, role: "admin" }).onConflictDoUpdate({ target: usersTable.username, set: { passwordHash: ph, pinHash: p, role: "admin", updatedAt: new Date() } });
+    await db.insert(usersTable).values({ username: "cashier1", email: "cashier1@mirrortech.gh", passwordHash: await bcrypt.hash("cash123", 10), pinHash: await bcrypt.hash("1234", 10), role: "cashier", locationId: loc1Id, station: "Counter 1" }).onConflictDoUpdate({ target: usersTable.username, set: { passwordHash: await bcrypt.hash("cash123", 10), pinHash: await bcrypt.hash("1234", 10), role: "cashier", locationId: loc1Id, station: "Counter 1", updatedAt: new Date() } });
+    await db.insert(usersTable).values({ username: "cashier2", email: "cashier2@mirrortech.gh", passwordHash: await bcrypt.hash("cash123", 10), pinHash: await bcrypt.hash("4321", 10), role: "cashier", locationId: loc2Id, station: "Counter 2" }).onConflictDoUpdate({ target: usersTable.username, set: { passwordHash: await bcrypt.hash("cash123", 10), pinHash: await bcrypt.hash("4321", 10), role: "cashier", locationId: loc2Id, station: "Counter 2", updatedAt: new Date() } });
+    await db.insert(usersTable).values({ username: "manager1", email: "manager@mirrortech.gh", passwordHash: await bcrypt.hash("mgr123", 10), pinHash: await bcrypt.hash("5678", 10), role: "manager", locationId: loc1Id }).onConflictDoUpdate({ target: usersTable.username, set: { passwordHash: await bcrypt.hash("mgr123", 10), pinHash: await bcrypt.hash("5678", 10), role: "manager", locationId: loc1Id, updatedAt: new Date() } });
+    await db.insert(categoriesTable).values([
+      { name: "Electronics", color: "#3B82F6", description: "Electronic devices" },
+      { name: "Fashion & Clothing", color: "#EC4899", description: "Apparel" },
+      { name: "Food & Beverages", color: "#10B981", description: "Consumables" },
+      { name: "Home & Living", color: "#F59E0B", description: "Household items" },
+    ]).onConflictDoNothing();
+    const cats = await db.select().from(categoriesTable).limit(4);
+    const catIds = cats.map(c => c.id);
+    if (loc1Id) {
+      await db.insert(inventoryTable).values([
+        { name: "Samsung Galaxy A55", sku: "SAM-A55-001", price: "1850.00", cost: "1500.00", wholesalePrice1: "1650.00", wholesalePrice2: "1550.00", quantity: 25, minQuantity: 5, locationId: loc1Id, categoryId: catIds[0], unit: "piece" },
+        { name: "iPhone 15 Case", sku: "IPH-CASE-002", price: "45.00", cost: "20.00", wholesalePrice1: "35.00", wholesalePrice2: "30.00", quantity: 100, minQuantity: 20, locationId: loc1Id, categoryId: catIds[0], unit: "piece" },
+        { name: "Wireless Earbuds", sku: "EAR-WL-003", price: "180.00", cost: "90.00", wholesalePrice1: "150.00", wholesalePrice2: "135.00", quantity: 40, minQuantity: 10, locationId: loc1Id, categoryId: catIds[0], unit: "piece" },
+        { name: "Men's Polo Shirt", sku: "POL-M-004", price: "75.00", cost: "35.00", wholesalePrice1: "60.00", wholesalePrice2: "55.00", quantity: 60, minQuantity: 10, locationId: loc1Id, categoryId: catIds[1], unit: "piece" },
+        { name: "Ladies Handbag", sku: "BAG-L-005", price: "120.00", cost: "60.00", wholesalePrice1: "100.00", wholesalePrice2: "90.00", quantity: 30, minQuantity: 5, locationId: loc1Id, categoryId: catIds[1], unit: "piece" },
+        { name: "Malta Drink 330ml", sku: "MALT-330-006", price: "4.50", cost: "2.50", wholesalePrice1: "3.50", quantity: 3, minQuantity: 48, locationId: loc1Id, categoryId: catIds[2], unit: "can" },
+        { name: "Bottled Water 500ml", sku: "WAT-500-007", price: "2.00", cost: "0.80", wholesalePrice1: "1.50", quantity: 200, minQuantity: 50, locationId: loc1Id, categoryId: catIds[2], unit: "bottle" },
+        { name: "Rice (5kg)", sku: "RICE-5KG-008", price: "55.00", cost: "40.00", wholesalePrice1: "48.00", wholesalePrice2: "45.00", quantity: 80, minQuantity: 20, locationId: loc1Id, categoryId: catIds[2], unit: "bag" },
+        { name: "Electric Kettle", sku: "KTL-EL-009", price: "95.00", cost: "55.00", wholesalePrice1: "80.00", wholesalePrice2: "75.00", quantity: 15, minQuantity: 3, locationId: loc1Id, categoryId: catIds[3], unit: "piece" },
+        { name: "Ceiling Fan 52\"", sku: "FAN-52-010", price: "280.00", cost: "180.00", wholesalePrice1: "250.00", wholesalePrice2: "230.00", quantity: 8, minQuantity: 2, locationId: loc1Id, categoryId: catIds[3], unit: "piece" },
+      ]).onConflictDoUpdate({ target: inventoryTable.sku, set: { updatedAt: new Date() } });
+    }
+    res.json({ status: "seeded" });
+  } catch (err) {
+    res.status(500).json({ status: "error", error: String(err) });
+  }
+});
+
+// ============ MOMO (Simulated) ============
+const momoPayments = new Map<string, { status: string; phone: string; amount: string; network: string }>();
+
+app.post("/api/momo/initiate", authenticateToken, async (req, res) => {
+  const { phone, network, amount, reference } = req.body;
+  if (!phone || !network || !amount) { res.status(400).json({ error: "phone, network, amount required" }); return; }
+  const ref = reference ?? nanoid(12);
+  momoPayments.set(ref, { status: "pending", phone, amount, network });
+  setTimeout(() => { const p = momoPayments.get(ref); if (p) p.status = "successful"; }, 3000);
+  res.json({ success: true, reference: ref, status: "pending", message: `Payment request sent to ${phone}` });
+});
+
+app.get("/api/momo/status/:reference", authenticateToken, async (req, res) => {
+  const payment = momoPayments.get(String(req.params.reference));
+  if (!payment) { res.json({ reference: req.params.reference, status: "not_found", amount: null, phone: null }); return; }
+  res.json({ reference: req.params.reference, status: payment.status, amount: payment.amount, phone: payment.phone });
+});
+
+// ============ STATIC FILES ============
+app.use(express.static(path.join(__dirname, "../public")));
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api")) return next();
+  res.sendFile(path.join(__dirname, "../public/index.html"));
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

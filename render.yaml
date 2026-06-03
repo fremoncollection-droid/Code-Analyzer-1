@@ -19,6 +19,8 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
 
 databases:
   - name: mirrortech-pos-db

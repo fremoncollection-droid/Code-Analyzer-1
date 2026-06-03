@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import crypto from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
@@ -32,6 +33,8 @@ app.use((req, res, next) => {
 });
 
 app.use(cors());
+// Raw body must be before express.json() for Paystack webhook signature verification
+app.use("/api/payment/paystack-webhook", express.raw({ type: "*/*" }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -835,6 +838,52 @@ app.post("/api/momo/confirm/:reference", authenticateToken, (req, res) => {
   if (!payment) { res.status(404).json({ error: "Payment not found" }); return; }
   payment.status = "successful";
   res.json({ success: true, reference: req.params.reference, status: "successful" });
+});
+
+// ============ PAYSTACK PAYMENT ============
+const PAYSTACK_BASE = "https://api.paystack.co";
+
+app.post("/api/payment/charge-momo", authenticateToken, async (req: any, res: any) => {
+  const { email, amount, phoneNumber, provider } = req.body;
+  if (!email || !amount || !phoneNumber || !provider) {
+    res.status(400).json({ error: "email, amount, phoneNumber, and provider are required" });
+    return;
+  }
+  const secretKey = process.env.PAYSTACK_SECRET_KEY;
+  if (!secretKey) { res.status(500).json({ error: "Paystack is not configured on this server" }); return; }
+
+  const amountInPesewas = Math.round(amount * 100);
+  try {
+    const paystackRes = await fetch(`${PAYSTACK_BASE}/charge`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${secretKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, amount: amountInPesewas, currency: "GHS", mobile_money: { phone: phoneNumber, provider } }),
+    });
+    const data = await paystackRes.json() as any;
+    if (!data.status) { res.status(400).json({ error: data.message ?? "Paystack charge failed" }); return; }
+    const { reference, status } = data.data;
+    res.json({ success: true, reference, status });
+  } catch (err) {
+    console.error("Paystack charge-momo error", err);
+    res.status(500).json({ error: "Failed to initiate mobile money charge" });
+  }
+});
+
+app.post("/api/payment/paystack-webhook", (req: any, res: any) => {
+  res.sendStatus(200);
+  const secretKey = process.env.PAYSTACK_SECRET_KEY;
+  if (!secretKey) return;
+  const signature = req.headers["x-paystack-signature"] as string | undefined;
+  if (!signature) { console.warn("Paystack webhook: missing signature"); return; }
+  const hash = crypto.createHmac("sha512", secretKey).update(req.body as Buffer).digest("hex");
+  if (hash !== signature) { console.warn("Paystack webhook: signature mismatch"); return; }
+  let event: { event: string; data: any };
+  try { event = JSON.parse((req.body as Buffer).toString("utf8")); } catch { return; }
+  if (event.event === "charge.success") {
+    const { reference, amount, currency, channel } = event.data;
+    const amountInGHS = (amount / 100).toFixed(2);
+    console.log(`Paystack charge.success — ref: ${reference}, GHS ${amountInGHS}, currency: ${currency}, channel: ${channel}`);
+  }
 });
 
 // ============ STATIC FILES ============

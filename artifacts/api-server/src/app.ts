@@ -27,6 +27,8 @@ app.use(
   }),
 );
 app.use(cors());
+// Raw body must be captured before express.json() for Paystack webhook signature verification
+app.use("/api/payment/paystack-webhook", express.raw({ type: "*/*" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

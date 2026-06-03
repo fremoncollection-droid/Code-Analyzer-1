@@ -22,6 +22,7 @@ import leadsRouter from "./leads";
 import tasksRouter from "./tasks";
 import discountRequestsRouter from "./discount_requests";
 import permissionsRouter from "./permissions";
+import paymentRouter from "./payment";
 
 const router: IRouter = Router();
 
@@ -48,5 +49,6 @@ router.use("/leads", leadsRouter);
 router.use("/tasks", tasksRouter);
 router.use("/discount-requests", discountRequestsRouter);
 router.use("/permissions", permissionsRouter);
+router.use("/payment", paymentRouter);
 
 export default router;

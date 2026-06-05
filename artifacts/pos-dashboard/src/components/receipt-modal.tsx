@@ -122,15 +122,29 @@ export default function ReceiptModal({ open, onClose, transactionId }: Props) {
 
             <Separator className="border-dashed" />
 
-            <div className="space-y-0.5 text-[10px]">
-              <div className="flex justify-between">
-                <span>Payment</span>
-                <span className="capitalize font-bold">{tx?.paymentMethod}</span>
-              </div>
-              {tx?.momoPhone && <div className="flex justify-between"><span>MoMo Phone</span><span>{tx.momoPhone}</span></div>}
-              {tx?.momoNetwork && <div className="flex justify-between"><span>Network</span><span>{tx.momoNetwork}</span></div>}
-              {tx?.momoReference && <div className="flex justify-between"><span>Ref</span><span>{tx.momoReference}</span></div>}
-            </div>
+            {(() => {
+              const cashInfo = (() => {
+                if ((tx as any)?.paymentMethod !== "cash" || !(tx as any)?.notes) return null;
+                try { return JSON.parse((tx as any).notes); } catch { return null; }
+              })();
+              return (
+                <div className="space-y-0.5 text-[10px]">
+                  <div className="flex justify-between">
+                    <span>Payment</span>
+                    <span className="capitalize font-bold">{tx?.paymentMethod}</span>
+                  </div>
+                  {tx?.momoPhone && <div className="flex justify-between"><span>MoMo Phone</span><span>{tx.momoPhone}</span></div>}
+                  {tx?.momoNetwork && <div className="flex justify-between"><span>Network</span><span>{tx.momoNetwork}</span></div>}
+                  {tx?.momoReference && <div className="flex justify-between"><span>Ref</span><span>{tx.momoReference}</span></div>}
+                  {cashInfo?.cashReceived && (
+                    <>
+                      <div className="flex justify-between"><span>Cash Received</span><span className="tabular-nums">{formatCurrency(cashInfo.cashReceived)}</span></div>
+                      <div className="flex justify-between font-bold border-t border-dashed pt-0.5 mt-0.5"><span>Change Given</span><span className="tabular-nums">{formatCurrency(cashInfo.changeDue ?? 0)}</span></div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
 
             <Separator className="border-dashed" />
 

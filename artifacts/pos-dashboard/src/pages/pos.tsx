@@ -99,6 +99,7 @@ export default function POSPage() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [momoConfirming, setMomoConfirming] = useState(false);
+  const [cashReceived, setCashReceived] = useState("");
   const [showScannerHint, setShowScannerHint] = useState(false);
   const [quickScan, setQuickScan] = useState(false);
   const [cameraScanOpen, setCameraScanOpen] = useState(false);
@@ -210,6 +211,9 @@ export default function POSPage() {
   const taxAmount = taxBreakdown.totalTax;
   const total = subtotal + taxAmount;
   const momoConfirmed = momoStatus?.status === "successful";
+  const cashReceivedNum = parseFloat(cashReceived) || 0;
+  const changeDue = Math.max(0, cashReceivedNum - total);
+  const insufficientCash = cashReceived === "" || cashReceivedNum < total;
 
   // Get wholesale tier price for an item
   function getItemPrice(item: any): number {
@@ -390,6 +394,9 @@ export default function POSPage() {
       momoReference: momoRef ?? undefined,
       customerName: customerName || undefined,
       customerPhone: customerPhone || undefined,
+      notes: paymentMethod === "cash" && cashReceived
+        ? JSON.stringify({ cashReceived: cashReceivedNum.toFixed(2), changeDue: changeDue.toFixed(2) })
+        : undefined,
     };
   }
 
@@ -913,7 +920,7 @@ export default function POSPage() {
       </div>
 
       {/* ============ CHECKOUT DIALOG ============ */}
-      <Dialog open={checkoutOpen} onOpenChange={(v) => { if (!v) { setCheckoutOpen(false); setMomoRef(null); } }}>
+      <Dialog open={checkoutOpen} onOpenChange={(v) => { if (!v) { setCheckoutOpen(false); setMomoRef(null); setCashReceived(""); } }}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1000,10 +1007,52 @@ export default function POSPage() {
               </div>
             )}
 
-            {/* Cash / Card info */}
+            {/* Cash handling — amount received + change calculator */}
             {paymentMethod === "cash" && (
-              <div className="p-3 bg-teal-50 rounded-lg border border-teal-200 text-sm text-teal-700">
-                <div className="flex items-center gap-2"><Banknote className="w-4 h-4" /> Collect <strong className="tabular-nums">{formatCurrency(total)}</strong> in cash</div>
+              <div className="space-y-3 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                <div className="flex items-center gap-2 text-sm text-teal-700 font-medium">
+                  <Banknote className="w-4 h-4" />
+                  Total due: <span className="tabular-nums font-bold">{formatCurrency(total)}</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-teal-800 font-semibold">Amount Received (₵)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={cashReceived}
+                    onChange={e => setCashReceived(e.target.value)}
+                    onFocus={e => e.target.select()}
+                    placeholder="0.00"
+                    className="h-10 text-base bg-white border-teal-300 focus:border-teal-500"
+                    autoFocus
+                  />
+                </div>
+
+                <div className={cn(
+                  "flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-semibold transition-colors",
+                  cashReceived === ""
+                    ? "bg-white/60 text-muted-foreground border border-teal-200"
+                    : insufficientCash
+                    ? "bg-red-100 text-red-700 border border-red-300"
+                    : "bg-teal-600 text-white"
+                )}>
+                  <span className="text-[13px]">Change Due</span>
+                  <span className="tabular-nums text-base">
+                    {cashReceived === ""
+                      ? "—"
+                      : insufficientCash
+                      ? "Insufficient Cash"
+                      : formatCurrency(changeDue)}
+                  </span>
+                </div>
+
+                {cashReceived !== "" && insufficientCash && (
+                  <p className="text-xs text-red-600 text-center">
+                    Short by <span className="font-bold tabular-nums">{formatCurrency(total - cashReceivedNum)}</span>
+                  </p>
+                )}
               </div>
             )}
             {paymentMethod === "card" && (
@@ -1024,8 +1073,8 @@ export default function POSPage() {
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setCheckoutOpen(false); setMomoRef(null); }}>Cancel</Button>
-            <Button className={cn(isWholesale && "bg-blue-600 hover:bg-blue-700")} onClick={handleCheckout} disabled={createTx.isPending || (paymentMethod === "momo" && !momoConfirmed) || (isWholesale && !selectedCustomerId)}>
+            <Button variant="outline" onClick={() => { setCheckoutOpen(false); setMomoRef(null); setCashReceived(""); }}>Cancel</Button>
+            <Button className={cn(isWholesale && "bg-blue-600 hover:bg-blue-700")} onClick={handleCheckout} disabled={createTx.isPending || (paymentMethod === "momo" && !momoConfirmed) || (isWholesale && !selectedCustomerId) || (paymentMethod === "cash" && insufficientCash)}>
               {createTx.isPending ? "Processing..." : "Complete Sale"}
             </Button>
           </DialogFooter>

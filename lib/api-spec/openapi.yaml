@@ -1001,6 +1001,11 @@ paths:
           schema:
             type: string
             enum: [today, week, month, year]
+        - name: salesMode
+          in: query
+          schema:
+            type: string
+            enum: [retail, wholesale]
       responses:
         "200":
           description: Summary
@@ -1025,6 +1030,11 @@ paths:
           in: query
           schema:
             type: integer
+        - name: salesMode
+          in: query
+          schema:
+            type: string
+            enum: [retail, wholesale]
       responses:
         "200":
           description: Sales by day
@@ -1051,6 +1061,11 @@ paths:
           in: query
           schema:
             type: integer
+        - name: salesMode
+          in: query
+          schema:
+            type: string
+            enum: [retail, wholesale]
       responses:
         "200":
           description: Top items

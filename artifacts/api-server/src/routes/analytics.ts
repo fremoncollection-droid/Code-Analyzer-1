@@ -34,7 +34,7 @@ function getPeriodStart(period = "today"): Date {
 }
 
 router.get("/summary", authenticateToken, async (req, res) => {
-  const { locationId, period = "today" } = req.query as Record<string, string>;
+  const { locationId, period = "today", salesMode } = req.query as Record<string, string>;
   const user = (req as any).user;
 
   let effectiveLocationId = locationId;
@@ -48,6 +48,9 @@ router.get("/summary", authenticateToken, async (req, res) => {
     gte(transactionsTable.createdAt, startDate),
   ];
   if (effectiveLocationId) conditions.push(eq(transactionsTable.locationId, effectiveLocationId));
+  if (salesMode && ["retail", "wholesale"].includes(salesMode)) {
+    conditions.push(eq(transactionsTable.salesMode, salesMode));
+  }
 
   const [summary] = await db
     .select({
@@ -94,7 +97,7 @@ router.get("/summary", authenticateToken, async (req, res) => {
 });
 
 router.get("/sales-by-day", authenticateToken, async (req, res) => {
-  const { locationId, days = "7" } = req.query as Record<string, string>;
+  const { locationId, days = "7", salesMode } = req.query as Record<string, string>;
   const user = (req as any).user;
 
   let effectiveLocationId = locationId;
@@ -111,6 +114,9 @@ router.get("/sales-by-day", authenticateToken, async (req, res) => {
     gte(transactionsTable.createdAt, startDate),
   ];
   if (effectiveLocationId) conditions.push(eq(transactionsTable.locationId, effectiveLocationId));
+  if (salesMode && ["retail", "wholesale"].includes(salesMode)) {
+    conditions.push(eq(transactionsTable.salesMode, salesMode));
+  }
 
   const rows = await db
     .select({
@@ -127,7 +133,7 @@ router.get("/sales-by-day", authenticateToken, async (req, res) => {
 });
 
 router.get("/top-items", authenticateToken, async (req, res) => {
-  const { locationId, limit = "10" } = req.query as Record<string, string>;
+  const { locationId, limit = "10", salesMode } = req.query as Record<string, string>;
   const user = (req as any).user;
 
   let effectiveLocationId = locationId;
@@ -137,6 +143,9 @@ router.get("/top-items", authenticateToken, async (req, res) => {
 
   const conditions: any[] = [eq(transactionsTable.isVoided, false)];
   if (effectiveLocationId) conditions.push(eq(transactionsTable.locationId, effectiveLocationId));
+  if (salesMode && ["retail", "wholesale"].includes(salesMode)) {
+    conditions.push(eq(transactionsTable.salesMode, salesMode));
+  }
 
   const rows = await db
     .select({

@@ -1044,7 +1044,8 @@ export const ApproveTransferResponse = zod.object({
  */
 export const GetAnalyticsSummaryQueryParams = zod.object({
   "locationId": zod.coerce.string().optional(),
-  "period": zod.enum(['today', 'week', 'month', 'year']).optional()
+  "period": zod.enum(['today', 'week', 'month', 'year']).optional(),
+  "salesMode": zod.enum(['retail', 'wholesale']).optional()
 })
 
 export const GetAnalyticsSummaryResponse = zod.object({
@@ -1064,7 +1065,8 @@ export const GetAnalyticsSummaryResponse = zod.object({
  */
 export const GetSalesByDayQueryParams = zod.object({
   "locationId": zod.coerce.string().optional(),
-  "days": zod.coerce.number().optional()
+  "days": zod.coerce.number().optional(),
+  "salesMode": zod.enum(['retail', 'wholesale']).optional()
 })
 
 export const GetSalesByDayResponseItem = zod.object({
@@ -1080,7 +1082,8 @@ export const GetSalesByDayResponse = zod.array(GetSalesByDayResponseItem)
  */
 export const GetTopItemsQueryParams = zod.object({
   "locationId": zod.coerce.string().optional(),
-  "limit": zod.coerce.number().optional()
+  "limit": zod.coerce.number().optional(),
+  "salesMode": zod.enum(['retail', 'wholesale']).optional()
 })
 
 export const GetTopItemsResponseItem = zod.object({

@@ -765,6 +765,7 @@ status?: string;
 export type GetAnalyticsSummaryParams = {
 locationId?: string;
 period?: GetAnalyticsSummaryPeriod;
+salesMode?: GetAnalyticsSummarySalesMode;
 };
 
 export type GetAnalyticsSummaryPeriod = typeof GetAnalyticsSummaryPeriod[keyof typeof GetAnalyticsSummaryPeriod];
@@ -777,15 +778,41 @@ export const GetAnalyticsSummaryPeriod = {
   year: 'year',
 } as const;
 
+export type GetAnalyticsSummarySalesMode = typeof GetAnalyticsSummarySalesMode[keyof typeof GetAnalyticsSummarySalesMode];
+
+
+export const GetAnalyticsSummarySalesMode = {
+  retail: 'retail',
+  wholesale: 'wholesale',
+} as const;
+
 export type GetSalesByDayParams = {
 locationId?: string;
 days?: number;
+salesMode?: GetSalesByDaySalesMode;
 };
+
+export type GetSalesByDaySalesMode = typeof GetSalesByDaySalesMode[keyof typeof GetSalesByDaySalesMode];
+
+
+export const GetSalesByDaySalesMode = {
+  retail: 'retail',
+  wholesale: 'wholesale',
+} as const;
 
 export type GetTopItemsParams = {
 locationId?: string;
 limit?: number;
+salesMode?: GetTopItemsSalesMode;
 };
+
+export type GetTopItemsSalesMode = typeof GetTopItemsSalesMode[keyof typeof GetTopItemsSalesMode];
+
+
+export const GetTopItemsSalesMode = {
+  retail: 'retail',
+  wholesale: 'wholesale',
+} as const;
 
 export type ListUsersParams = {
 role?: string;

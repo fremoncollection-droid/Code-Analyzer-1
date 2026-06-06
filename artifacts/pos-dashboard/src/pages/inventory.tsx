@@ -200,81 +200,85 @@ export default function InventoryPage() {
 
       {/* Add/Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{editItem ? "Edit Item" : "Add Inventory Item"}</DialogTitle></DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-2">
-            <div className="col-span-2 space-y-1">
-              <Label>Name *</Label>
-              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Product name" />
-            </div>
-            <div className="space-y-1">
-              <Label>SKU</Label>
-              <Input value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} placeholder="SKU-001" />
-            </div>
-            <div className="space-y-1">
-              <Label>Unit</Label>
-              <Select value={form.unitId} onValueChange={v => setForm(f => ({ ...f, unitId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
-                <SelectContent>
-                  {units?.map(u => <SelectItem key={u.id} value={u.id}>{u.name} ({u.abbreviation})</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Selling Price (₵) *</Label>
-              <Input type="number" step="0.01" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" />
-            </div>
-            <div className="space-y-1">
-              <Label>Cost Price (₵)</Label>
-              <Input type="number" step="0.01" value={form.cost} onChange={e => setForm(f => ({ ...f, cost: e.target.value }))} placeholder="0.00" />
-            </div>
-            <div className="col-span-2">
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-3">
-                <p className="text-xs font-semibold text-blue-700 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-blue-600 inline-block" />
-                  Wholesale Pricing (optional)
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Tier 1 Price (₵)</Label>
-                    <Input type="number" step="0.01" value={form.wholesalePrice1} onChange={e => setForm(f => ({ ...f, wholesalePrice1: e.target.value }))} placeholder="0.00" className="bg-white" />
+        <DialogContent className="p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-0">
+            <DialogTitle>{editItem ? "Edit Item" : "Add Inventory Item"}</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 px-6 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 space-y-1">
+                <Label>Name *</Label>
+                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Product name" />
+              </div>
+              <div className="space-y-1">
+                <Label>SKU</Label>
+                <Input value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} placeholder="SKU-001" />
+              </div>
+              <div className="space-y-1">
+                <Label>Unit</Label>
+                <Select value={form.unitId} onValueChange={v => setForm(f => ({ ...f, unitId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
+                  <SelectContent>
+                    {units?.map(u => <SelectItem key={u.id} value={u.id}>{u.name} ({u.abbreviation})</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Selling Price (₵) *</Label>
+                <Input type="number" step="0.01" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" />
+              </div>
+              <div className="space-y-1">
+                <Label>Cost Price (₵)</Label>
+                <Input type="number" step="0.01" value={form.cost} onChange={e => setForm(f => ({ ...f, cost: e.target.value }))} placeholder="0.00" />
+              </div>
+              <div className="col-span-2">
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-3">
+                  <p className="text-xs font-semibold text-blue-700 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-600 inline-block" />
+                    Wholesale Pricing (optional)
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Tier 1 Price (₵)</Label>
+                      <Input type="number" step="0.01" value={form.wholesalePrice1} onChange={e => setForm(f => ({ ...f, wholesalePrice1: e.target.value }))} placeholder="0.00" className="bg-white" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Tier 2 Price (₵)</Label>
+                      <Input type="number" step="0.01" value={form.wholesalePrice2} onChange={e => setForm(f => ({ ...f, wholesalePrice2: e.target.value }))} placeholder="0.00" className="bg-white" />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Tier 2 Price (₵)</Label>
-                    <Input type="number" step="0.01" value={form.wholesalePrice2} onChange={e => setForm(f => ({ ...f, wholesalePrice2: e.target.value }))} placeholder="0.00" className="bg-white" />
-                  </div>
+                  <p className="text-[11px] text-blue-600">Leave blank to use selling price for wholesale orders</p>
                 </div>
-                <p className="text-[11px] text-blue-600">Leave blank to use selling price for wholesale orders</p>
+              </div>
+              <div className="space-y-1">
+                <Label>Quantity</Label>
+                <Input type="number" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Min Stock Alert</Label>
+                <Input type="number" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Category</Label>
+                <Select value={form.categoryId} onValueChange={v => setForm(f => ({ ...f, categoryId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectContent>
+                    {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Shelf</Label>
+                <Select value={form.shelfId} onValueChange={v => setForm(f => ({ ...f, shelfId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select shelf" /></SelectTrigger>
+                  <SelectContent>
+                    {shelves?.map(s => <SelectItem key={s.id} value={s.id}>{s.name} ({s.zone})</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            <div className="space-y-1">
-              <Label>Quantity</Label>
-              <Input type="number" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>Min Stock Alert</Label>
-              <Input type="number" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label>Category</Label>
-              <Select value={form.categoryId} onValueChange={v => setForm(f => ({ ...f, categoryId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                <SelectContent>
-                  {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Shelf</Label>
-              <Select value={form.shelfId} onValueChange={v => setForm(f => ({ ...f, shelfId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select shelf" /></SelectTrigger>
-                <SelectContent>
-                  {shelves?.map(s => <SelectItem key={s.id} value={s.id}>{s.name} ({s.zone})</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="px-6 py-4 border-t">
             <Button variant="outline" onClick={closeDialog}>Cancel</Button>
             <Button onClick={handleSubmit} disabled={!form.name || !form.price || createItem.isPending || updateItem.isPending}>
               {editItem ? "Save Changes" : "Add Item"}

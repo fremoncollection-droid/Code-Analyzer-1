@@ -24,6 +24,8 @@ export default function InventoryPage() {
     name: "",
     sku: "",
     price: "",
+    wholesalePrice1: "",
+    wholesalePrice2: "",
     cost: "",
     quantity: "0",
     minQuantity: "5",
@@ -50,7 +52,7 @@ export default function InventoryPage() {
 
   function openCreate() {
     setEditItem(null);
-    setForm({ name: "", sku: "", price: "", cost: "", quantity: "0", minQuantity: "5", categoryId: "", unitId: "", shelfId: "", unit: "piece" });
+    setForm({ name: "", sku: "", price: "", wholesalePrice1: "", wholesalePrice2: "", cost: "", quantity: "0", minQuantity: "5", categoryId: "", unitId: "", shelfId: "", unit: "piece" });
     setDialogOpen(true);
   }
 
@@ -60,6 +62,8 @@ export default function InventoryPage() {
       name: item.name,
       sku: item.sku ?? "",
       price: item.price,
+      wholesalePrice1: item.wholesalePrice1 ?? "",
+      wholesalePrice2: item.wholesalePrice2 ?? "",
       cost: item.cost ?? "",
       quantity: String(item.quantity),
       minQuantity: String(item.minQuantity),
@@ -78,6 +82,8 @@ export default function InventoryPage() {
       name: form.name,
       sku: form.sku || undefined,
       price: form.price,
+      wholesalePrice1: form.wholesalePrice1 || undefined,
+      wholesalePrice2: form.wholesalePrice2 || undefined,
       cost: form.cost || undefined,
       quantity: parseInt(form.quantity),
       minQuantity: parseInt(form.minQuantity),
@@ -131,7 +137,8 @@ export default function InventoryPage() {
               <tr className="border-b border-border">
                 <th className="text-left px-4 py-3 text-muted-foreground font-medium">Item</th>
                 <th className="text-left px-4 py-3 text-muted-foreground font-medium">Category</th>
-                <th className="text-right px-4 py-3 text-muted-foreground font-medium">Price</th>
+                <th className="text-right px-4 py-3 text-muted-foreground font-medium">Retail Price</th>
+                <th className="text-right px-4 py-3 text-muted-foreground font-medium hidden md:table-cell">Wholesale</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">Stock</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">Actions</th>
               </tr>
@@ -161,6 +168,11 @@ export default function InventoryPage() {
                     {item.categoryName ? <Badge variant="secondary" className="text-xs">{item.categoryName}</Badge> : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.price)}</td>
+                  <td className="px-4 py-3 text-right hidden md:table-cell">
+                    {item.wholesalePrice1
+                      ? <span className="text-blue-600 font-medium text-sm">{formatCurrency(item.wholesalePrice1)}</span>
+                      : <span className="text-muted-foreground text-xs">—</span>}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <span className={`font-semibold ${item.quantity <= (item.minQuantity ?? 0) ? "text-amber-600" : "text-foreground"}`}>
                       {item.quantity}
@@ -215,6 +227,25 @@ export default function InventoryPage() {
             <div className="space-y-1">
               <Label>Cost Price (₵)</Label>
               <Input type="number" step="0.01" value={form.cost} onChange={e => setForm(f => ({ ...f, cost: e.target.value }))} placeholder="0.00" />
+            </div>
+            <div className="col-span-2">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-3">
+                <p className="text-xs font-semibold text-blue-700 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-600 inline-block" />
+                  Wholesale Pricing (optional)
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tier 1 Price (₵)</Label>
+                    <Input type="number" step="0.01" value={form.wholesalePrice1} onChange={e => setForm(f => ({ ...f, wholesalePrice1: e.target.value }))} placeholder="0.00" className="bg-white" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tier 2 Price (₵)</Label>
+                    <Input type="number" step="0.01" value={form.wholesalePrice2} onChange={e => setForm(f => ({ ...f, wholesalePrice2: e.target.value }))} placeholder="0.00" className="bg-white" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-blue-600">Leave blank to use selling price for wholesale orders</p>
+              </div>
             </div>
             <div className="space-y-1">
               <Label>Quantity</Label>

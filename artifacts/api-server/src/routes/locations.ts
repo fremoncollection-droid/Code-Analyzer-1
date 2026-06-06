@@ -35,4 +35,28 @@ router.post("/", authenticateToken, async (req, res) => {
   res.status(201).json(loc);
 });
 
+router.put("/:id", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  if (!["admin", "manager"].includes(user.role)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const id = String(req.params.id);
+  const { name, address, phone } = req.body as { name?: string; address?: string; phone?: string };
+  if (!name) {
+    res.status(400).json({ error: "name required" });
+    return;
+  }
+  const [loc] = await db
+    .update(locationsTable)
+    .set({ name, address: address ?? null, phone: phone ?? null })
+    .where(eq(locationsTable.id, id))
+    .returning();
+  if (!loc) {
+    res.status(404).json({ error: "Location not found" });
+    return;
+  }
+  res.json(loc);
+});
+
 export default router;

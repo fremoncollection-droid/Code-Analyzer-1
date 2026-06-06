@@ -4,6 +4,7 @@ import { useBranding } from "@/lib/branding";
 import {
   useListLocations,
   useCreateLocation,
+  useUpdateLocation,
   useSeedData,
   useGetSettings,
   useUpdateSettings,
@@ -61,6 +62,7 @@ export default function SettingsPage() {
   // Location state
   const [locationDialog, setLocationDialog] = useState(false);
   const [locForm, setLocForm] = useState({ name: "", address: "", phone: "" });
+  const [locEditing, setLocEditing] = useState<string | null>(null);
 
   // Tax state
   const [vatRate, setVatRate] = useState<string>("");
@@ -115,6 +117,18 @@ export default function SettingsPage() {
         setLocationDialog(false);
         setLocForm({ name: "", address: "", phone: "" });
         toast({ title: "Location created" });
+      },
+    },
+  });
+
+  const updateLocation = useUpdateLocation({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["/api/locations"] });
+        setLocationDialog(false);
+        setLocEditing(null);
+        setLocForm({ name: "", address: "", phone: "" });
+        toast({ title: "Location updated" });
       },
     },
   });
@@ -508,10 +522,25 @@ export default function SettingsPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm">{loc.name}</p>
                   {loc.address && <p className="text-xs text-muted-foreground truncate">{loc.address}</p>}
+                  {loc.phone && <p className="text-xs text-muted-foreground">{loc.phone}</p>}
                 </div>
                 <Badge variant={loc.isActive ? "secondary" : "outline"} className="text-xs">
                   {loc.isActive ? "Active" : "Inactive"}
                 </Badge>
+                {isAdmin && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      setLocEditing(loc.id);
+                      setLocForm({ name: loc.name, address: loc.address ?? "", phone: loc.phone ?? "" });
+                      setLocationDialog(true);
+                    }}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                )}
               </div>
             ))}
             {(!locations || locations.length === 0) && (
@@ -906,10 +935,12 @@ export default function SettingsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: Add Location */}
-      <Dialog open={locationDialog} onOpenChange={setLocationDialog}>
+      {/* Dialog: Add / Edit Location */}
+      <Dialog open={locationDialog} onOpenChange={(v) => { setLocationDialog(v); if (!v) { setLocEditing(null); setLocForm({ name: "", address: "", phone: "" }); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add Location</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{locEditing ? "Edit Location" : "Add Location"}</DialogTitle>
+          </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1">
               <Label>Name *</Label>
@@ -925,10 +956,22 @@ export default function SettingsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setLocationDialog(false)}>Cancel</Button>
-            <Button onClick={() => createLocation.mutate({ data: { name: locForm.name, address: locForm.address || undefined, phone: locForm.phone || undefined } })} disabled={!locForm.name || createLocation.isPending}>
-              Create Location
-            </Button>
+            <Button variant="outline" onClick={() => { setLocationDialog(false); setLocEditing(null); setLocForm({ name: "", address: "", phone: "" }); }}>Cancel</Button>
+            {locEditing ? (
+              <Button
+                onClick={() => updateLocation.mutate({ id: locEditing, data: { name: locForm.name, address: locForm.address || undefined, phone: locForm.phone || undefined } })}
+                disabled={!locForm.name || updateLocation.isPending}
+              >
+                {updateLocation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => createLocation.mutate({ data: { name: locForm.name, address: locForm.address || undefined, phone: locForm.phone || undefined } })}
+                disabled={!locForm.name || createLocation.isPending}
+              >
+                {createLocation.isPending ? "Creating..." : "Create Location"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

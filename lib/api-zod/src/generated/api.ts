@@ -162,6 +162,29 @@ export const GetLocationResponse = zod.object({
 
 
 /**
+ * @summary Update a location
+ */
+export const UpdateLocationParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateLocationBody = zod.object({
+  "name": zod.string(),
+  "address": zod.string().optional(),
+  "phone": zod.string().optional()
+})
+
+export const UpdateLocationResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "address": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.string().optional()
+})
+
+
+/**
  * @summary List inventory items
  */
 export const ListInventoryQueryParams = zod.object({

@@ -210,6 +210,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Location"
+    put:
+      operationId: updateLocation
+      tags: [locations]
+      summary: Update a location
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
 
   /inventory:
     get:

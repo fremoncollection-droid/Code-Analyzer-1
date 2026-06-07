@@ -59,4 +59,15 @@ router.put("/:id", authenticateToken, async (req, res) => {
   res.json(loc);
 });
 
+router.delete("/:id", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  if (user.role !== "admin") {
+    res.status(403).json({ error: "Admin only" });
+    return;
+  }
+  const id = String(req.params.id);
+  await db.update(locationsTable).set({ isActive: false }).where(eq(locationsTable.id, id));
+  res.status(204).send();
+});
+
 export default router;

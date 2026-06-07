@@ -171,6 +171,13 @@ app.post("/api/locations", authenticateToken, async (req, res) => {
   const [row] = await db.insert(locationsTable).values({ name, address, phone }).returning();
   res.status(201).json(row);
 });
+app.delete("/api/locations/:id", authenticateToken, async (req, res) => {
+  const user = (req as any).user;
+  if (user.role !== "admin") { res.status(403).json({ error: "Admin only" }); return; }
+  await db.update(locationsTable).set({ isActive: false }).where(eq(locationsTable.id, String(req.params.id)));
+  res.status(204).send();
+});
+
 app.patch("/api/locations/:id", authenticateToken, async (req, res) => {
   const [row] = await db.update(locationsTable).set(req.body).where(eq(locationsTable.id, String(req.params.id))).returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }

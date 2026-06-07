@@ -12,20 +12,35 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Users, Layers, Check, X } from "lucide-react";
+import { Shield, Users, Check, X, LockKeyhole, Unlock } from "lucide-react";
 
 const MODULES = [
-  "pos", "inventory", "transactions", "analytics", "leads", "tasks",
-  "discount-requests", "cashiers", "shifts", "transfers", "audit", "settings",
-  "sales-logs", "display", "locations", "categories", "units", "shelves",
+  { key: "pos", label: "Point of Sale" },
+  { key: "inventory", label: "Inventory" },
+  { key: "transactions", label: "Transactions" },
+  { key: "analytics", label: "Analytics" },
+  { key: "leads", label: "Leads" },
+  { key: "tasks", label: "Tasks" },
+  { key: "discount-requests", label: "Discount Requests" },
+  { key: "cashiers", label: "Cashiers" },
+  { key: "shifts", label: "Shifts" },
+  { key: "transfers", label: "Transfers" },
+  { key: "audit", label: "Audit Log" },
+  { key: "settings", label: "Settings" },
+  { key: "sales-logs", label: "Sales Logs" },
+  { key: "display", label: "Display Mode" },
+  { key: "locations", label: "Locations" },
+  { key: "categories", label: "Categories" },
+  { key: "units", label: "Units" },
+  { key: "shelves", label: "Shelves" },
 ];
 
 const ACTIONS = [
-  { key: "canView", label: "View", icon: Check },
-  { key: "canCreate", label: "Create", icon: Check },
-  { key: "canEdit", label: "Edit", icon: Check },
-  { key: "canDelete", label: "Delete", icon: Check },
-  { key: "canApprove", label: "Approve", icon: Check },
+  { key: "canView", label: "View" },
+  { key: "canCreate", label: "Create" },
+  { key: "canEdit", label: "Edit" },
+  { key: "canDelete", label: "Delete" },
+  { key: "canApprove", label: "Approve" },
 ];
 
 export default function PermissionsPage() {
@@ -33,6 +48,7 @@ export default function PermissionsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [selectedUser, setSelectedUser] = useState<string>("");
+  const [filterMode, setFilterMode] = useState<"all" | "assigned" | "unassigned">("all");
 
   const { data: users } = useListUsers();
   const { data: permissions } = useListPermissions(
@@ -78,15 +94,34 @@ export default function PermissionsPage() {
     }
   };
 
+  const assignedModules = MODULES.filter(m => permissions?.find(p => p.module === m.key));
+  const unassignedModules = MODULES.filter(m => !permissions?.find(p => p.module === m.key));
+
+  const visibleModules =
+    filterMode === "assigned" ? assignedModules :
+    filterMode === "unassigned" ? unassignedModules :
+    MODULES;
+
+  if (!user || (user.role !== "admin")) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center h-full text-center">
+        <Shield className="w-12 h-12 text-muted-foreground mb-3" />
+        <h1 className="text-xl font-bold">Access Denied</h1>
+        <p className="text-muted-foreground text-sm mt-1">Only admins can manage permissions.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Role & Permissions</h1>
         <p className="text-muted-foreground text-sm mt-0.5">
-          Admin control: assign granular permissions per user and module
+          Assign granular access per user and module
         </p>
       </div>
 
+      {/* User picker */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -97,22 +132,27 @@ export default function PermissionsPage() {
         <CardContent>
           <Select value={selectedUser} onValueChange={setSelectedUser}>
             <SelectTrigger className="w-full max-w-md">
-              <SelectValue placeholder="Select a user to manage permissions" />
+              <SelectValue placeholder="Choose a user to manage their permissions" />
             </SelectTrigger>
             <SelectContent>
               {users?.map(u => (
                 <SelectItem key={u.id} value={u.id}>
-                  {u.username} ({u.role}) {u.locationId ? "— " + u.locationId : ""}
+                  {u.username} — {u.role}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           {selectedUserData && (
-            <div className="mt-3 flex items-center gap-2 text-sm">
-              <Badge variant="outline">{selectedUserData.role}</Badge>
-              <span className="text-muted-foreground">{selectedUserData.email}</span>
+            <div className="mt-3 flex items-center gap-2 text-sm flex-wrap">
+              <Badge variant="outline" className="capitalize">{selectedUserData.role}</Badge>
+              {selectedUserData.email && <span className="text-muted-foreground">{selectedUserData.email}</span>}
               {selectedUserData.station && (
                 <Badge variant="secondary" className="text-[10px]">{selectedUserData.station}</Badge>
+              )}
+              {selectedUser && permissions && (
+                <Badge className="bg-teal-50 text-teal-700 text-[10px] ml-auto">
+                  {assignedModules.length} / {MODULES.length} modules assigned
+                </Badge>
               )}
             </div>
           )}
@@ -122,57 +162,104 @@ export default function PermissionsPage() {
       {selectedUser && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Shield className="w-4 h-4 text-teal-600" />
-              Module Permissions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1">
-              {/* Header */}
-              <div className="grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground px-2 py-1">
-                <div className="col-span-2">Module</div>
-                <div className="col-span-1 text-center">View</div>
-                <div className="col-span-1 text-center">Create</div>
-                <div className="col-span-1 text-center">Edit</div>
-                <div className="col-span-1 text-center">Delete</div>
-                <div className="col-span-1 text-center">Approve</div>
-                <div className="col-span-1"></div>
-              </div>
-              {MODULES.map(module => {
-                const existing = permissions?.find(p => p.module === module);
-                return (
-                  <div
-                    key={module}
-                    className={`grid grid-cols-12 gap-2 items-center px-2 py-2 rounded-md text-sm ${
-                      existing ? "bg-teal-50/50 border border-teal-100" : "border border-transparent hover:bg-muted/50"
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Shield className="w-4 h-4 text-teal-600" />
+                Module Access
+              </CardTitle>
+              <div className="flex items-center gap-1 text-xs">
+                {(["all", "assigned", "unassigned"] as const).map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setFilterMode(mode)}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-colors capitalize ${
+                      filterMode === mode
+                        ? "bg-teal-600 text-white"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    <div className="col-span-2 flex items-center gap-2 font-medium">
-                      <Layers className="w-3 h-3 text-muted-foreground" />
-                      {module}
+                    {mode === "all" ? `All (${MODULES.length})` :
+                     mode === "assigned" ? `Assigned (${assignedModules.length})` :
+                     `No Access (${unassignedModules.length})`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {/* Header row */}
+            <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-muted-foreground px-4 py-2 border-b border-border bg-muted/30">
+              <div className="col-span-3">Module</div>
+              <div className="col-span-1 text-center">Status</div>
+              {ACTIONS.map(a => (
+                <div key={a.key} className="col-span-1 text-center">{a.label}</div>
+              ))}
+              <div className="col-span-1" />
+            </div>
+
+            <div className="divide-y divide-border">
+              {visibleModules.map(module => {
+                const existing = permissions?.find(p => p.module === module.key);
+                const hasAny = !!existing;
+                return (
+                  <div
+                    key={module.key}
+                    className={`grid grid-cols-12 gap-2 items-center px-4 py-2.5 text-sm transition-colors ${
+                      hasAny ? "bg-teal-50/40 hover:bg-teal-50/60" : "hover:bg-muted/30"
+                    }`}
+                  >
+                    {/* Module name */}
+                    <div className="col-span-3 flex items-center gap-2 font-medium">
+                      {hasAny
+                        ? <Unlock className="w-3 h-3 text-teal-600 flex-shrink-0" />
+                        : <LockKeyhole className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                      }
+                      {module.label}
                     </div>
+
+                    {/* Status badge */}
+                    <div className="col-span-1 flex justify-center">
+                      {hasAny ? (
+                        <Badge className="text-[9px] px-1.5 py-0 bg-teal-100 text-teal-700 font-semibold">
+                          Assigned
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 text-muted-foreground">
+                          No Access
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Toggle buttons */}
                     {ACTIONS.map(action => {
                       const val = (existing as any)?.[action.key] ?? false;
                       return (
                         <div key={action.key} className="col-span-1 flex justify-center">
                           <button
-                            onClick={() => handleToggle(module, action.key, val)}
+                            onClick={() => handleToggle(module.key, action.key, val)}
+                            title={val ? `Revoke ${action.label}` : `Grant ${action.label}`}
                             className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${
                               val
-                                ? "bg-teal-600 text-white"
-                                : "bg-muted border border-border hover:bg-muted/80"
+                                ? "bg-teal-600 text-white hover:bg-teal-700"
+                                : "bg-muted border border-border hover:bg-muted/80 text-muted-foreground"
                             }`}
                           >
-                            {val ? <Check className="w-3 h-3" /> : <X className="w-3 h-3 text-muted-foreground" />}
+                            {val ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
                           </button>
                         </div>
                       );
                     })}
+
+                    {/* Reset button */}
                     <div className="col-span-1 flex justify-end">
                       {existing && (
-                        <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => handleResetModule(module)}>
-                          Reset
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 text-[10px] text-destructive hover:text-destructive px-2"
+                          onClick={() => handleResetModule(module.key)}
+                        >
+                          Remove
                         </Button>
                       )}
                     </div>
@@ -180,6 +267,12 @@ export default function PermissionsPage() {
                 );
               })}
             </div>
+
+            {visibleModules.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                {filterMode === "assigned" ? "No modules assigned yet." : "All modules have been assigned."}
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

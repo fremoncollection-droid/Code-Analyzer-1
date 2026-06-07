@@ -5,6 +5,7 @@ import {
   useListLocations,
   useCreateLocation,
   useUpdateLocation,
+  useDeleteLocation,
   useSeedData,
   useGetSettings,
   useUpdateSettings,
@@ -63,6 +64,7 @@ export default function SettingsPage() {
   const [locationDialog, setLocationDialog] = useState(false);
   const [locForm, setLocForm] = useState({ name: "", address: "", phone: "" });
   const [locEditing, setLocEditing] = useState<string | null>(null);
+  const [locDeleteConfirm, setLocDeleteConfirm] = useState<string | null>(null);
 
   // Tax state
   const [vatRate, setVatRate] = useState<string>("");
@@ -118,6 +120,17 @@ export default function SettingsPage() {
         setLocForm({ name: "", address: "", phone: "" });
         toast({ title: "Location created" });
       },
+    },
+  });
+
+  const deleteLocation = useDeleteLocation({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["/api/locations"] });
+        setLocDeleteConfirm(null);
+        toast({ title: "Location removed" });
+      },
+      onError: () => toast({ title: "Failed to remove location", variant: "destructive" }),
     },
   });
 
@@ -528,18 +541,28 @@ export default function SettingsPage() {
                   {loc.isActive ? "Active" : "Inactive"}
                 </Badge>
                 {isAdmin && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                    onClick={() => {
-                      setLocEditing(loc.id);
-                      setLocForm({ name: loc.name, address: loc.address ?? "", phone: loc.phone ?? "" });
-                      setLocationDialog(true);
-                    }}
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setLocEditing(loc.id);
+                        setLocForm({ name: loc.name, address: loc.address ?? "", phone: loc.phone ?? "" });
+                        setLocationDialog(true);
+                      }}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      onClick={() => setLocDeleteConfirm(loc.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 )}
               </div>
             ))}
@@ -791,6 +814,30 @@ export default function SettingsPage() {
               disabled={!catForm.name || createCategory.isPending || updateCategory.isPending}
             >
               {catEditing ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Confirm Delete Location */}
+      <Dialog open={!!locDeleteConfirm} onOpenChange={(open) => { if (!open) setLocDeleteConfirm(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-4 h-4" /> Remove Location
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to remove this location? It will be deactivated and hidden from the system.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLocDeleteConfirm(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => locDeleteConfirm && deleteLocation.mutate({ id: locDeleteConfirm })}
+              disabled={deleteLocation.isPending}
+            >
+              {deleteLocation.isPending ? "Removing..." : "Remove Location"}
             </Button>
           </DialogFooter>
         </DialogContent>

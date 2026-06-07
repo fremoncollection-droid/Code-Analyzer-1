@@ -185,6 +185,14 @@ export const UpdateLocationResponse = zod.object({
 
 
 /**
+ * @summary Delete (deactivate) a location
+ */
+export const DeleteLocationParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+/**
  * @summary List inventory items
  */
 export const ListInventoryQueryParams = zod.object({

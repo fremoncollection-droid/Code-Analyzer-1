@@ -20,20 +20,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const navItems = [
-  { path: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { path: "/", icon: LayoutDashboard, label: "Dashboard", roles: ["admin", "manager"] },
   { path: "/pos", icon: ShoppingCart, label: "Point of Sale" },
-  { path: "/inventory", icon: Package, label: "Inventory" },
-  { path: "/transactions", icon: CreditCard, label: "Transactions" },
-  { path: "/analytics", icon: BarChart2, label: "Analytics" },
-  { path: "/leads", icon: Target, label: "My Leads" },
+  { path: "/inventory", icon: Package, label: "Inventory", roles: ["admin", "manager"] },
+  { path: "/transactions", icon: CreditCard, label: "Transactions", roles: ["admin", "manager"] },
+  { path: "/analytics", icon: BarChart2, label: "Analytics", roles: ["admin", "manager"] },
+  { path: "/leads", icon: Target, label: "My Leads", roles: ["admin", "manager"] },
   { path: "/sales-manager", icon: BarChart3, label: "Sales Manager", roles: ["manager", "admin"] },
-  { path: "/transfers", icon: ArrowLeftRight, label: "Transfers" },
-  { path: "/shifts", icon: Calendar, label: "Shifts" },
+  { path: "/transfers", icon: ArrowLeftRight, label: "Transfers", roles: ["admin", "manager"] },
+  { path: "/shifts", icon: Calendar, label: "Shifts", roles: ["admin", "manager"] },
   { path: "/cashiers", icon: Users, label: "Cashiers", roles: ["admin", "manager"] },
   { path: "/audit", icon: ShieldCheck, label: "Audit", roles: ["admin", "manager"] },
   { path: "/sales-logs", icon: ClipboardList, label: "Sales Logs", roles: ["admin", "manager"] },
   { path: "/permissions", icon: Shield, label: "Permissions", roles: ["admin"] },
-  { path: "/settings", icon: Settings, label: "Settings" },
+  { path: "/settings", icon: Settings, label: "Settings", roles: ["admin", "manager"] },
   { path: "/display", icon: Monitor, label: "Display", roles: ["admin", "manager"] },
 ];
 

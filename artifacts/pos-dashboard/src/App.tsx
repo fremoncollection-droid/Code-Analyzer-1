@@ -31,11 +31,18 @@ const queryClient = new QueryClient({
 });
 
 function AuthenticatedApp() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   if (!isAuthenticated) return <LoginPage />;
+
+  const isCashier = user?.role === "cashier";
+
   return (
     <Layout>
       <Switch>
+        {/* Cashier: every route goes to POS */}
+        {isCashier && <Route path="/:rest*" component={POSPage} />}
+
+        {/* Admin / Manager full routing */}
         <Route path="/" component={DashboardPage} />
         <Route path="/pos" component={POSPage} />
         <Route path="/inventory" component={InventoryPage} />

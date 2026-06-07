@@ -12,11 +12,13 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
+import { useLocation } from "wouter";
 
 export default function DashboardPage() {
   const { selectedLocationId } = useAuth();
   const { salesMode, isWholesale } = useSalesMode();
   const [period, setPeriod] = useState<"today" | "week" | "month" | "year">("today");
+  const [, navigate] = useLocation();
 
   const { data: summary, isLoading } = useGetAnalyticsSummary({
     locationId: selectedLocationId ?? undefined,
@@ -47,6 +49,7 @@ export default function DashboardPage() {
       icon: TrendingUp,
       color: accent.text,
       bg: accent.bg,
+      href: "/analytics",
     },
     {
       title: "Transactions",
@@ -54,6 +57,7 @@ export default function DashboardPage() {
       icon: ShoppingBag,
       color: "text-purple-600",
       bg: "bg-purple-50",
+      href: "/transactions",
     },
     {
       title: "Avg. Order Value",
@@ -61,6 +65,7 @@ export default function DashboardPage() {
       icon: CreditCard,
       color: "text-indigo-600",
       bg: "bg-indigo-50",
+      href: "/analytics",
     },
     isWholesale
       ? {
@@ -69,6 +74,7 @@ export default function DashboardPage() {
           icon: PackageCheck,
           color: "text-amber-600",
           bg: "bg-amber-50",
+          href: "/transactions",
         }
       : {
           title: "Low Stock Items",
@@ -76,6 +82,7 @@ export default function DashboardPage() {
           icon: AlertTriangle,
           color: "text-amber-600",
           bg: "bg-amber-50",
+          href: "/inventory",
         },
   ];
 
@@ -137,7 +144,11 @@ export default function DashboardPage() {
       {/* Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((m) => (
-          <Card key={m.title} className="border-card-border">
+          <Card
+            key={m.title}
+            onClick={() => navigate(m.href)}
+            className="border-card-border cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 hover:border-border/80 active:scale-95"
+          >
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -155,7 +166,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Sales chart */}
-        <Card className="lg:col-span-2 border-card-border">
+        <Card onClick={() => navigate("/analytics")} className="lg:col-span-2 border-card-border cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99]">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <BarChart3 className={cn("w-4 h-4", accent.text)} />
@@ -213,7 +224,7 @@ export default function DashboardPage() {
 
       {/* Top items */}
       {topItems && topItems.length > 0 && (
-        <Card className="border-card-border">
+        <Card onClick={() => navigate("/inventory")} className="border-card-border cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99]">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
               Top Selling Items — {isWholesale ? "Wholesale" : "Retail"}

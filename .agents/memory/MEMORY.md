@@ -1,0 +1,1 @@
+- [Render deploy build sequence](render-deploy.md) — after EVERY frontend change, must rebuild pos-dashboard + copy dist + rebuild render-app server bundle.

@@ -201,10 +201,10 @@ export default function InventoryPage() {
       {/* Add/Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="p-0 gap-0">
-          <DialogHeader className="px-6 pt-6 pb-0">
+          <DialogHeader className="px-6 pt-6 pb-0 shrink-0">
             <DialogTitle>{editItem ? "Edit Item" : "Add Inventory Item"}</DialogTitle>
           </DialogHeader>
-          <div className="overflow-y-auto flex-1 px-6 py-4">
+          <div className="overflow-y-auto flex-1 min-h-0 px-6 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-1">
                 <Label>Name *</Label>
@@ -278,7 +278,7 @@ export default function InventoryPage() {
               </div>
             </div>
           </div>
-          <DialogFooter className="px-6 py-4 border-t">
+          <DialogFooter className="px-6 py-4 border-t shrink-0">
             <Button variant="outline" onClick={closeDialog}>Cancel</Button>
             <Button onClick={handleSubmit} disabled={!form.name || !form.price || createItem.isPending || updateItem.isPending}>
               {editItem ? "Save Changes" : "Add Item"}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useListInventory, useListCategories, useListLocations, useListUnits, useListShelves, useCreateInventoryItem, useUpdateInventoryItem, useDeleteInventoryItem } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Edit2, Trash2, AlertTriangle, Package } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, AlertTriangle, Package, TrendingUp, DollarSign, ShoppingBag, BarChart2 } from "lucide-react";
 
 export default function InventoryPage() {
   const { selectedLocationId } = useAuth();
@@ -21,18 +21,8 @@ export default function InventoryPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState<any | null>(null);
   const [form, setForm] = useState({
-    name: "",
-    sku: "",
-    price: "",
-    wholesalePrice1: "",
-    wholesalePrice2: "",
-    cost: "",
-    quantity: "0",
-    minQuantity: "5",
-    categoryId: "",
-    unitId: "",
-    shelfId: "",
-    unit: "piece",
+    name: "", sku: "", price: "", wholesalePrice1: "", wholesalePrice2: "",
+    cost: "", quantity: "0", minQuantity: "5", categoryId: "", unitId: "", shelfId: "", unit: "piece",
   });
 
   const { data: inventory, isLoading } = useListInventory({
@@ -40,67 +30,40 @@ export default function InventoryPage() {
     search: search || undefined,
   });
   const { data: categories } = useListCategories();
-  const { data: locations } = useListLocations();
   const { data: units } = useListUnits();
   const { data: shelves } = useListShelves();
 
   const createItem = useCreateInventoryItem({ mutation: { onSuccess: () => { invalidate(); closeDialog(); toast({ title: "Item created" }); } } });
   const updateItem = useUpdateInventoryItem({ mutation: { onSuccess: () => { invalidate(); closeDialog(); toast({ title: "Item updated" }); } } });
-  const deleteItem = useDeleteInventoryItem({ mutation: { onSuccess: () => { invalidate(); closeDialog(); toast({ title: "Item deleted" }); } } });
+  const deleteItem = useDeleteInventoryItem({ mutation: { onSuccess: () => { invalidate(); toast({ title: "Item deleted" }); } } });
 
   function invalidate() { qc.invalidateQueries({ queryKey: ["/api/inventory"] }); }
-
   function openCreate() {
     setEditItem(null);
     setForm({ name: "", sku: "", price: "", wholesalePrice1: "", wholesalePrice2: "", cost: "", quantity: "0", minQuantity: "5", categoryId: "", unitId: "", shelfId: "", unit: "piece" });
     setDialogOpen(true);
   }
-
   function openEdit(item: any) {
     setEditItem(item);
-    setForm({
-      name: item.name,
-      sku: item.sku ?? "",
-      price: item.price,
-      wholesalePrice1: item.wholesalePrice1 ?? "",
-      wholesalePrice2: item.wholesalePrice2 ?? "",
-      cost: item.cost ?? "",
-      quantity: String(item.quantity),
-      minQuantity: String(item.minQuantity),
-      categoryId: item.categoryId ?? "",
-      unitId: item.unitId ?? "",
-      shelfId: item.shelfId ?? "",
-      unit: item.unit ?? "piece",
-    });
+    setForm({ name: item.name, sku: item.sku ?? "", price: item.price, wholesalePrice1: item.wholesalePrice1 ?? "", wholesalePrice2: item.wholesalePrice2 ?? "", cost: item.cost ?? "", quantity: String(item.quantity), minQuantity: String(item.minQuantity), categoryId: item.categoryId ?? "", unitId: item.unitId ?? "", shelfId: item.shelfId ?? "", unit: item.unit ?? "piece" });
     setDialogOpen(true);
   }
-
   function closeDialog() { setDialogOpen(false); setEditItem(null); }
-
   function handleSubmit() {
-    const payload = {
-      name: form.name,
-      sku: form.sku || undefined,
-      price: form.price,
-      wholesalePrice1: form.wholesalePrice1 || undefined,
-      wholesalePrice2: form.wholesalePrice2 || undefined,
-      cost: form.cost || undefined,
-      quantity: parseInt(form.quantity),
-      minQuantity: parseInt(form.minQuantity),
-      categoryId: form.categoryId || undefined,
-      unitId: form.unitId || undefined,
-      shelfId: form.shelfId || undefined,
-      unit: form.unit,
-      locationId: selectedLocationId ?? undefined,
-    };
-    if (editItem) {
-      updateItem.mutate({ id: editItem.id, data: payload });
-    } else {
-      createItem.mutate({ data: payload });
-    }
+    const payload = { name: form.name, sku: form.sku || undefined, price: form.price, wholesalePrice1: form.wholesalePrice1 || undefined, wholesalePrice2: form.wholesalePrice2 || undefined, cost: form.cost || undefined, quantity: parseInt(form.quantity), minQuantity: parseInt(form.minQuantity), categoryId: form.categoryId || undefined, unitId: form.unitId || undefined, shelfId: form.shelfId || undefined, unit: form.unit, locationId: selectedLocationId ?? undefined };
+    if (editItem) updateItem.mutate({ id: editItem.id, data: payload });
+    else createItem.mutate({ data: payload });
   }
 
-  const lowStockItems = inventory?.filter(i => i.quantity <= (i.minQuantity ?? 0)) ?? [];
+  const items = inventory ?? [];
+  const lowStockItems = items.filter(i => i.quantity <= (i.minQuantity ?? 0));
+
+  // Compute totals
+  const totalSellingValue = items.reduce((sum, i) => sum + parseFloat(i.price ?? "0") * (i.quantity ?? 0), 0);
+  const totalCostValue = items.reduce((sum, i) => sum + parseFloat(i.cost ?? "0") * (i.quantity ?? 0), 0);
+  const totalProfit = totalSellingValue - totalCostValue;
+  const profitMargin = totalSellingValue > 0 ? (totalProfit / totalSellingValue) * 100 : 0;
+  const itemsWithCost = items.filter(i => i.cost && parseFloat(i.cost) > 0).length;
 
   return (
     <div className="p-6 space-y-6">
@@ -108,12 +71,60 @@ export default function InventoryPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Inventory</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{inventory?.length ?? 0} items</p>
+          <p className="text-muted-foreground text-sm mt-0.5">{items.length} items</p>
         </div>
         <Button onClick={openCreate} className="gap-2">
           <Plus className="w-4 h-4" /> Add Item
         </Button>
       </div>
+
+      {/* Financial summary cards */}
+      {!isLoading && items.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="border-card-border">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <ShoppingBag className="w-4 h-4 text-teal-600" />
+                <p className="text-xs text-muted-foreground font-medium">Stock Value</p>
+              </div>
+              <p className="text-xl font-bold text-teal-700">{formatCurrency(totalSellingValue)}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">at selling price</p>
+            </CardContent>
+          </Card>
+          <Card className="border-card-border">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <DollarSign className="w-4 h-4 text-orange-500" />
+                <p className="text-xs text-muted-foreground font-medium">Total Cost</p>
+              </div>
+              <p className="text-xl font-bold text-orange-600">{formatCurrency(totalCostValue)}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{itemsWithCost} items with cost set</p>
+            </CardContent>
+          </Card>
+          <Card className="border-card-border">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="w-4 h-4 text-green-600" />
+                <p className="text-xs text-muted-foreground font-medium">Potential Profit</p>
+              </div>
+              <p className={`text-xl font-bold ${totalProfit >= 0 ? "text-green-600" : "text-destructive"}`}>{formatCurrency(totalProfit)}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">if all stock is sold</p>
+            </CardContent>
+          </Card>
+          <Card className="border-card-border">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <BarChart2 className="w-4 h-4 text-blue-600" />
+                <p className="text-xs text-muted-foreground font-medium">Profit Margin</p>
+              </div>
+              <p className={`text-xl font-bold ${profitMargin >= 20 ? "text-green-600" : profitMargin >= 10 ? "text-amber-600" : "text-muted-foreground"}`}>
+                {profitMargin.toFixed(1)}%
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">overall average</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Low stock alert */}
       {lowStockItems.length > 0 && (
@@ -137,9 +148,12 @@ export default function InventoryPage() {
               <tr className="border-b border-border">
                 <th className="text-left px-4 py-3 text-muted-foreground font-medium">Item</th>
                 <th className="text-left px-4 py-3 text-muted-foreground font-medium">Category</th>
-                <th className="text-right px-4 py-3 text-muted-foreground font-medium">Retail Price</th>
-                <th className="text-right px-4 py-3 text-muted-foreground font-medium hidden md:table-cell">Wholesale</th>
+                <th className="text-right px-4 py-3 text-muted-foreground font-medium">Cost Price</th>
+                <th className="text-right px-4 py-3 text-muted-foreground font-medium">Sell Price</th>
+                <th className="text-right px-4 py-3 text-muted-foreground font-medium hidden lg:table-cell">Wholesale</th>
+                <th className="text-right px-4 py-3 text-muted-foreground font-medium">Profit/unit</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">Stock</th>
+                <th className="text-right px-4 py-3 text-muted-foreground font-medium">Total Cost</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">Actions</th>
               </tr>
             </thead>
@@ -147,53 +161,102 @@ export default function InventoryPage() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="border-b border-border">
-                    <td colSpan={5} className="px-4 py-3"><div className="h-4 bg-muted rounded animate-pulse w-48" /></td>
+                    <td colSpan={9} className="px-4 py-3"><div className="h-4 bg-muted rounded animate-pulse w-48" /></td>
                   </tr>
                 ))
-              ) : inventory?.map(item => (
-                <tr key={item.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
-                        <Package className="w-4 h-4 text-muted-foreground" />
+              ) : items.map(item => {
+                const sellPrice = parseFloat(item.price ?? "0");
+                const costPrice = parseFloat(item.cost ?? "0");
+                const profitPerUnit = costPrice > 0 ? sellPrice - costPrice : null;
+                const totalItemCost = costPrice * (item.quantity ?? 0);
+                const margin = costPrice > 0 && sellPrice > 0 ? ((sellPrice - costPrice) / sellPrice * 100) : null;
+
+                return (
+                  <tr key={item.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                          <Package className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{item.name}</p>
+                          {item.sku && <p className="text-xs text-muted-foreground">{item.sku}</p>}
+                          {item.unitName && <p className="text-xs text-muted-foreground">{item.unitName}</p>}
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{item.name}</p>
-                        {item.sku && <p className="text-xs text-muted-foreground">{item.sku}</p>}
-                        {item.unitName && <p className="text-xs text-muted-foreground">{item.unitName}</p>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {item.categoryName
+                        ? <Badge variant="secondary" className="text-xs">{item.categoryName}</Badge>
+                        : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {costPrice > 0
+                        ? <span className="text-orange-600 font-medium">{formatCurrency(costPrice)}</span>
+                        : <span className="text-muted-foreground text-xs">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold">{formatCurrency(sellPrice)}</td>
+                    <td className="px-4 py-3 text-right hidden lg:table-cell">
+                      {item.wholesalePrice1
+                        ? <span className="text-blue-600 font-medium">{formatCurrency(item.wholesalePrice1)}</span>
+                        : <span className="text-muted-foreground text-xs">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {profitPerUnit !== null ? (
+                        <div>
+                          <span className={`font-semibold text-sm ${profitPerUnit >= 0 ? "text-green-600" : "text-destructive"}`}>
+                            {formatCurrency(profitPerUnit)}
+                          </span>
+                          {margin !== null && (
+                            <p className="text-[10px] text-muted-foreground">{margin.toFixed(1)}%</p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={`font-semibold ${item.quantity <= (item.minQuantity ?? 0) ? "text-amber-600" : "text-foreground"}`}>
+                        {item.quantity}
+                      </span>
+                      <span className="text-muted-foreground text-xs"> / {item.minQuantity ?? 0}</span>
+                      {item.quantity <= (item.minQuantity ?? 0) && (
+                        <AlertTriangle className="inline w-3 h-3 ml-1 text-amber-500" />
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {totalItemCost > 0
+                        ? <span className="text-orange-600 font-medium text-sm">{formatCurrency(totalItemCost)}</span>
+                        : <span className="text-muted-foreground text-xs">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(item)}><Edit2 className="w-3 h-3" /></Button>
+                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteItem.mutate({ id: item.id })}><Trash2 className="w-3 h-3" /></Button>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {item.categoryName ? <Badge variant="secondary" className="text-xs">{item.categoryName}</Badge> : <span className="text-muted-foreground">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.price)}</td>
-                  <td className="px-4 py-3 text-right hidden md:table-cell">
-                    {item.wholesalePrice1
-                      ? <span className="text-blue-600 font-medium text-sm">{formatCurrency(item.wholesalePrice1)}</span>
-                      : <span className="text-muted-foreground text-xs">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <span className={`font-semibold ${item.quantity <= (item.minQuantity ?? 0) ? "text-amber-600" : "text-foreground"}`}>
-                      {item.quantity}
-                    </span>
-                    <span className="text-muted-foreground text-xs"> / {item.minQuantity ?? 0} min</span>
-                    {item.quantity <= (item.minQuantity ?? 0) && (
-                      <AlertTriangle className="inline w-3 h-3 ml-1 text-amber-500" />
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => openEdit(item)}><Edit2 className="w-3 h-3" /></Button>
-                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteItem.mutate({ id: item.id })}><Trash2 className="w-3 h-3" /></Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!isLoading && inventory?.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No items found</td></tr>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!isLoading && items.length === 0 && (
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">No items found</td></tr>
               )}
             </tbody>
+            {/* Footer totals row */}
+            {!isLoading && items.length > 0 && (
+              <tfoot>
+                <tr className="border-t-2 border-border bg-muted/30 font-semibold">
+                  <td colSpan={2} className="px-4 py-3 text-sm text-muted-foreground">Totals ({items.length} items)</td>
+                  <td className="px-4 py-3 text-right text-sm text-orange-600">{totalCostValue > 0 ? formatCurrency(totalCostValue / items.filter(i => parseFloat(i.cost ?? "0") > 0).length || 1) : "—"}</td>
+                  <td className="px-4 py-3 text-right text-sm">{formatCurrency(totalSellingValue / items.length)}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell" />
+                  <td className="px-4 py-3 text-right text-sm text-green-600">{formatCurrency(totalProfit / (itemsWithCost || 1))}</td>
+                  <td className="px-4 py-3 text-right text-sm">{items.reduce((s, i) => s + (i.quantity ?? 0), 0)} units</td>
+                  <td className="px-4 py-3 text-right text-sm text-orange-600 font-bold">{formatCurrency(totalCostValue)}</td>
+                  <td className="px-4 py-3" />
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </Card>
@@ -223,20 +286,38 @@ export default function InventoryPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
-                <Label>Selling Price (₵) *</Label>
-                <Input type="number" step="0.01" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" />
+
+              {/* Pricing section */}
+              <div className="col-span-2 rounded-lg border border-border bg-muted/20 p-3 space-y-3">
+                <p className="text-xs font-semibold text-foreground">Pricing</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Cost Price (₵)</Label>
+                    <Input type="number" step="0.01" value={form.cost} onChange={e => setForm(f => ({ ...f, cost: e.target.value }))} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Selling Price (₵) *</Label>
+                    <Input type="number" step="0.01" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" />
+                  </div>
+                </div>
+                {/* Live profit preview */}
+                {form.cost && form.price && parseFloat(form.cost) > 0 && parseFloat(form.price) > 0 && (
+                  <div className="flex items-center gap-4 pt-1 border-t border-border text-xs">
+                    <span className="text-muted-foreground">Profit per unit:</span>
+                    <span className={`font-bold ${parseFloat(form.price) - parseFloat(form.cost) >= 0 ? "text-green-600" : "text-destructive"}`}>
+                      {formatCurrency(parseFloat(form.price) - parseFloat(form.cost))}
+                    </span>
+                    <span className="text-muted-foreground">Margin:</span>
+                    <span className="font-bold text-blue-600">
+                      {((parseFloat(form.price) - parseFloat(form.cost)) / parseFloat(form.price) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                )}
               </div>
-              <div className="space-y-1">
-                <Label>Cost Price (₵)</Label>
-                <Input type="number" step="0.01" value={form.cost} onChange={e => setForm(f => ({ ...f, cost: e.target.value }))} placeholder="0.00" />
-              </div>
+
               <div className="col-span-2">
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-3">
-                  <p className="text-xs font-semibold text-blue-700 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-blue-600 inline-block" />
-                    Wholesale Pricing (optional)
-                  </p>
+                  <p className="text-xs font-semibold text-blue-700">Wholesale Pricing (optional)</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label className="text-xs">Tier 1 Price (₵)</Label>

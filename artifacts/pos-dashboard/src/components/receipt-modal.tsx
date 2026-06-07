@@ -16,8 +16,8 @@ export default function ReceiptModal({ open, onClose, transactionId }: Props) {
   });
   const { data: settings } = useGetSettings();
 
-  const logoUrl = settings?.logo_url;
-  const appName = settings?.app_name || "Fremon Collection POS";
+  const logoUrl = settings?.logo_url || "/fremon-logo.png";
+  const appName = settings?.app_name || "Fremon Creation";
   const receiptPhone = settings?.receipt_phone;
   const receiptEmail = settings?.receipt_email;
   const receiptWebsite = settings?.receipt_website;
@@ -40,34 +40,37 @@ export default function ReceiptModal({ open, onClose, transactionId }: Props) {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
           font-family: 'Courier New', Courier, monospace;
-          font-size: 11px;
+          font-size: 13px;
           width: 80mm;
           max-width: 80mm;
           margin: 0 auto;
           padding: 5mm 4mm 8mm;
           color: #000;
           background: #fff;
-          line-height: 1.4;
+          line-height: 1.55;
         }
-        img.logo { display: block; max-width: 56px; max-height: 56px; margin: 0 auto 4px; object-fit: contain; }
+        img.logo { display: block; max-width: 70px; max-height: 70px; margin: 0 auto 5px; object-fit: contain; }
         .center { text-align: center; }
         .right { text-align: right; }
-        .bold { font-weight: 700; }
-        .text-base { font-size: 13px; }
-        .text-sm { font-size: 11px; }
-        .text-xs { font-size: 10px; }
-        .text-tiny { font-size: 9px; }
-        .muted { color: #555; }
-        .row { display: flex; justify-content: space-between; align-items: baseline; margin: 1.5px 0; }
-        .divider-dashed { border: none; border-top: 1px dashed #666; margin: 5px 0; }
-        .divider-solid  { border: none; border-top: 1px solid #000;  margin: 5px 0; }
-        .divider-double { border: none; border-top: 3px double #000; margin: 5px 0; }
-        .gra-box { border: 1.5px solid #000; text-align: center; padding: 2px 4px; margin: 5px 0; }
-        .total-row { display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; padding: 2px 0; }
-        .item-name { font-weight: 600; font-size: 11px; }
-        .item-detail { color: #444; font-size: 10px; display: flex; justify-content: space-between; }
-        .section-label { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; color: #444; text-transform: uppercase; }
-        .void-stamp { border: 2px solid #000; display: inline-block; padding: 1px 6px; font-weight: 700; font-size: 10px; letter-spacing: 2px; }
+        .bold { font-weight: 800; }
+        .text-xl  { font-size: 16px; }
+        .text-lg  { font-size: 14px; }
+        .text-base{ font-size: 13px; }
+        .text-sm  { font-size: 12px; }
+        .text-xs  { font-size: 11px; }
+        .text-tiny{ font-size: 10px; }
+        .muted { color: #333; }
+        .row { display: flex; justify-content: space-between; align-items: baseline; margin: 2.5px 0; }
+        .divider-dashed { border: none; border-top: 1px dashed #555; margin: 6px 0; }
+        .divider-solid  { border: none; border-top: 1.5px solid #000; margin: 6px 0; }
+        .divider-double { border: none; border-top: 3px double #000; margin: 6px 0; }
+        .gra-box { border: 2px solid #000; text-align: center; padding: 3px 4px; margin: 6px 0; }
+        .total-row { display: flex; justify-content: space-between; font-size: 16px; font-weight: 800; padding: 3px 0; }
+        .item-name   { font-weight: 700; font-size: 13px; }
+        .item-detail { color: #333; font-size: 12px; display: flex; justify-content: space-between; }
+        .section-label { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #000; text-transform: uppercase; }
+        .void-stamp { border: 2.5px solid #000; display: inline-block; padding: 2px 8px; font-weight: 800; font-size: 12px; letter-spacing: 2px; }
+        .info-label { color: #333; font-weight: 600; }
       </style>
       </head><body>
       ${printContent.innerHTML}
@@ -97,9 +100,16 @@ export default function ReceiptModal({ open, onClose, transactionId }: Props) {
     try { return JSON.parse((tx as any).notes); } catch { return null; }
   })();
 
+  /* ── shared inline styles ── */
+  const S = {
+    label:   { color: "#333", fontWeight: 600 } as React.CSSProperties,
+    value:   { fontWeight: 700, color: "#000" } as React.CSSProperties,
+    row:     { display: "flex", justifyContent: "space-between", margin: "3px 0" } as React.CSSProperties,
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-[380px] p-0 overflow-hidden bg-gray-100">
+      <DialogContent className="max-w-[400px] p-0 overflow-hidden bg-gray-100">
         {/* Toolbar */}
         <DialogHeader className="px-4 py-2.5 bg-white border-b border-border flex-row items-center justify-between space-y-0">
           <DialogTitle className="text-sm font-semibold">Receipt Preview</DialogTitle>
@@ -120,110 +130,110 @@ export default function ReceiptModal({ open, onClose, transactionId }: Props) {
               id="receipt-content"
               className="bg-white shadow-lg"
               style={{
-                width: "280px",
+                width: "300px",
                 fontFamily: "'Courier New', Courier, monospace",
-                fontSize: "11px",
-                lineHeight: "1.45",
+                fontSize: "13px",
+                lineHeight: "1.55",
                 color: "#000",
               }}
             >
               {/* ── HEADER ── */}
               <div className="px-5 pt-5 pb-3 text-center">
-                {showLogo && logoUrl && (
+                {showLogo && (
                   <img
                     src={logoUrl}
                     alt="Logo"
                     className="logo mx-auto mb-2"
-                    style={{ maxWidth: "64px", maxHeight: "64px", objectFit: "contain", display: "block" }}
+                    style={{ maxWidth: "80px", maxHeight: "80px", objectFit: "contain", display: "block" }}
                   />
                 )}
-                <p className="bold text-base" style={{ fontSize: "14px", fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase" }}>
+                <p style={{ fontSize: "15px", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase" }}>
                   {businessName}
                 </p>
                 {receiptTagline && (
-                  <p className="text-tiny muted" style={{ fontSize: "9px", letterSpacing: "2px", color: "#666", textTransform: "uppercase", marginTop: "1px" }}>
+                  <p style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "2px", color: "#333", textTransform: "uppercase", marginTop: "2px" }}>
                     {receiptTagline}
                   </p>
                 )}
                 {displayAddress && (
-                  <p className="text-tiny" style={{ fontSize: "9px", color: "#555", marginTop: "3px" }}>{displayAddress}</p>
+                  <p style={{ fontSize: "11px", color: "#222", marginTop: "4px", fontWeight: 500 }}>{displayAddress}</p>
                 )}
                 {displayPhone && (
-                  <p className="text-tiny" style={{ fontSize: "9px", color: "#555" }}>Tel: {displayPhone}</p>
+                  <p style={{ fontSize: "11px", color: "#222", fontWeight: 500 }}>Tel: {displayPhone}</p>
                 )}
                 {receiptEmail && (
-                  <p className="text-tiny" style={{ fontSize: "9px", color: "#555" }}>{receiptEmail}</p>
+                  <p style={{ fontSize: "11px", color: "#222", fontWeight: 500 }}>{receiptEmail}</p>
                 )}
                 {receiptWebsite && (
-                  <p className="text-tiny" style={{ fontSize: "9px", color: "#555" }}>{receiptWebsite}</p>
+                  <p style={{ fontSize: "11px", color: "#222", fontWeight: 500 }}>{receiptWebsite}</p>
                 )}
                 {receiptTin && (
-                  <p className="text-tiny" style={{ fontSize: "9px", color: "#555" }}>TIN: {receiptTin}</p>
+                  <p style={{ fontSize: "11px", color: "#222", fontWeight: 600 }}>TIN: {receiptTin}</p>
                 )}
               </div>
 
               {/* ── GRA STAMP ── */}
-              <div className="mx-4 mb-2" style={{ border: "1.5px solid #000", textAlign: "center", padding: "3px 4px" }}>
-                <p style={{ fontSize: "8px", fontWeight: 700, letterSpacing: "1.5px" }}>GHANA REVENUE AUTHORITY</p>
-                <p style={{ fontSize: "10px", fontWeight: 700 }}>E-VAT OFFICIAL RECEIPT</p>
+              <div className="mx-4 mb-2" style={{ border: "2px solid #000", textAlign: "center", padding: "4px 6px" }}>
+                <p style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "1.5px" }}>GHANA REVENUE AUTHORITY</p>
+                <p style={{ fontSize: "12px", fontWeight: 800 }}>E-VAT OFFICIAL RECEIPT</p>
               </div>
 
               {/* ── DASHED DIVIDER ── */}
-              <div style={{ borderTop: "1px dashed #999", margin: "4px 16px" }} />
+              <div style={{ borderTop: "1px dashed #666", margin: "5px 16px" }} />
 
               {/* ── TRANSACTION INFO ── */}
-              <div className="px-5" style={{ fontSize: "10px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}>
-                  <span style={{ color: "#666" }}>Receipt No:</span>
-                  <span style={{ fontWeight: 700 }}>{tx?.receiptNumber}</span>
+              <div className="px-5" style={{ fontSize: "12px" }}>
+                <div style={S.row}>
+                  <span style={S.label}>Receipt No:</span>
+                  <span style={S.value}>{tx?.receiptNumber}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}>
-                  <span style={{ color: "#666" }}>GRA Ref:</span>
-                  <span style={{ fontFamily: "monospace" }}>{receipt?.graReceiptNumber}</span>
+                <div style={S.row}>
+                  <span style={S.label}>GRA Ref:</span>
+                  <span style={{ fontWeight: 700 }}>{receipt?.graReceiptNumber}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}>
-                  <span style={{ color: "#666" }}>Date:</span>
-                  <span>{tx?.createdAt ? formatDate(tx.createdAt) : "—"}</span>
+                <div style={S.row}>
+                  <span style={S.label}>Date:</span>
+                  <span style={{ fontWeight: 600 }}>{tx?.createdAt ? formatDate(tx.createdAt) : "—"}</span>
                 </div>
                 {tx?.cashierName && (
-                  <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}>
-                    <span style={{ color: "#666" }}>Cashier:</span>
-                    <span>{tx.cashierName}</span>
+                  <div style={S.row}>
+                    <span style={S.label}>Cashier:</span>
+                    <span style={{ fontWeight: 600 }}>{tx.cashierName}</span>
                   </div>
                 )}
                 {tx?.customerName && (
-                  <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}>
-                    <span style={{ color: "#666" }}>Customer:</span>
-                    <span>{tx.customerName}</span>
+                  <div style={S.row}>
+                    <span style={S.label}>Customer:</span>
+                    <span style={{ fontWeight: 600 }}>{tx.customerName}</span>
                   </div>
                 )}
                 {tx?.customerPhone && (
-                  <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}>
-                    <span style={{ color: "#666" }}>Phone:</span>
-                    <span>{tx.customerPhone}</span>
+                  <div style={S.row}>
+                    <span style={S.label}>Phone:</span>
+                    <span style={{ fontWeight: 600 }}>{tx.customerPhone}</span>
                   </div>
                 )}
               </div>
 
               {/* ── DASHED ── */}
-              <div style={{ borderTop: "1px dashed #999", margin: "6px 16px" }} />
+              <div style={{ borderTop: "1px dashed #666", margin: "7px 16px" }} />
 
               {/* ── ITEMS ── */}
               <div className="px-5">
-                <p style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "1.5px", color: "#555", marginBottom: "4px", textTransform: "uppercase" }}>
+                <p style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "1.5px", color: "#000", marginBottom: "5px", textTransform: "uppercase" }}>
                   Items Purchased
                 </p>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", color: "#777", borderBottom: "1px solid #e0e0e0", paddingBottom: "2px", marginBottom: "4px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#333", fontWeight: 600, borderBottom: "1.5px solid #000", paddingBottom: "3px", marginBottom: "5px" }}>
                   <span>Description</span><span>Amount</span>
                 </div>
                 {items.map((item: any, i: number) => {
                   const lineTotal = item.total ?? (parseFloat(item.price) * item.quantity);
                   return (
-                    <div key={i} style={{ marginBottom: "5px" }}>
-                      <p style={{ fontSize: "10px", fontWeight: 600, lineHeight: "1.3" }}>{item.name}</p>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", color: "#555" }}>
+                    <div key={i} style={{ marginBottom: "7px" }}>
+                      <p style={{ fontSize: "13px", fontWeight: 700, lineHeight: "1.4" }}>{item.name}</p>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#333", fontWeight: 600 }}>
                         <span>{item.quantity} × {formatCurrency(item.price)}</span>
-                        <span style={{ color: "#000", fontWeight: 500 }}>{formatCurrency(lineTotal)}</span>
+                        <span style={{ color: "#000", fontWeight: 700 }}>{formatCurrency(lineTotal)}</span>
                       </div>
                     </div>
                   );
@@ -231,96 +241,98 @@ export default function ReceiptModal({ open, onClose, transactionId }: Props) {
               </div>
 
               {/* ── SOLID DIVIDER ── */}
-              <div style={{ borderTop: "1px solid #ccc", margin: "4px 16px" }} />
+              <div style={{ borderTop: "1.5px solid #000", margin: "5px 16px" }} />
 
               {/* ── TOTALS ── */}
-              <div className="px-5" style={{ fontSize: "10px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}>
-                  <span style={{ color: "#666" }}>Subtotal</span>
-                  <span>{formatCurrency(tx?.subtotal ?? 0)}</span>
+              <div className="px-5" style={{ fontSize: "12px" }}>
+                <div style={S.row}>
+                  <span style={S.label}>Subtotal</span>
+                  <span style={{ fontWeight: 700 }}>{formatCurrency(tx?.subtotal ?? 0)}</span>
                 </div>
                 {taxBreakdown ? (
                   <>
-                    {taxBreakdown.vat    && <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}><span style={{ color: "#666" }}>VAT</span><span>{formatCurrency(taxBreakdown.vat)}</span></div>}
-                    {taxBreakdown.nhil   && <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}><span style={{ color: "#666" }}>NHIL</span><span>{formatCurrency(taxBreakdown.nhil)}</span></div>}
-                    {taxBreakdown.getFund && <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}><span style={{ color: "#666" }}>GETFund</span><span>{formatCurrency(taxBreakdown.getFund)}</span></div>}
-                    {taxBreakdown.covid  && <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}><span style={{ color: "#666" }}>COVID</span><span>{formatCurrency(taxBreakdown.covid)}</span></div>}
+                    {taxBreakdown.vat    && <div style={S.row}><span style={S.label}>VAT</span><span style={{ fontWeight: 700 }}>{formatCurrency(taxBreakdown.vat)}</span></div>}
+                    {taxBreakdown.nhil   && <div style={S.row}><span style={S.label}>NHIL</span><span style={{ fontWeight: 700 }}>{formatCurrency(taxBreakdown.nhil)}</span></div>}
+                    {taxBreakdown.getFund && <div style={S.row}><span style={S.label}>GETFund</span><span style={{ fontWeight: 700 }}>{formatCurrency(taxBreakdown.getFund)}</span></div>}
+                    {taxBreakdown.covid  && <div style={S.row}><span style={S.label}>COVID</span><span style={{ fontWeight: 700 }}>{formatCurrency(taxBreakdown.covid)}</span></div>}
                   </>
                 ) : (
-                  <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}>
-                    <span style={{ color: "#666" }}>VAT</span>
-                    <span>{formatCurrency(tx?.taxAmount ?? 0)}</span>
+                  <div style={S.row}>
+                    <span style={S.label}>VAT</span>
+                    <span style={{ fontWeight: 700 }}>{formatCurrency(tx?.taxAmount ?? 0)}</span>
                   </div>
                 )}
               </div>
 
               {/* ── DOUBLE RULE ── */}
-              <div style={{ borderTop: "3px double #000", margin: "5px 16px 4px" }} />
+              <div style={{ borderTop: "3px double #000", margin: "6px 16px 5px" }} />
 
               {/* ── GRAND TOTAL ── */}
               <div className="px-5 pb-1">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.5px" }}>TOTAL</span>
-                  <span style={{ fontSize: "14px", fontWeight: 700 }}>{formatCurrency(tx?.total ?? 0)}</span>
+                  <span style={{ fontSize: "15px", fontWeight: 800, letterSpacing: "0.5px" }}>TOTAL</span>
+                  <span style={{ fontSize: "16px", fontWeight: 800 }}>{formatCurrency(tx?.total ?? 0)}</span>
                 </div>
               </div>
 
               {/* ── DOUBLE RULE ── */}
-              <div style={{ borderTop: "3px double #000", margin: "4px 16px 6px" }} />
+              <div style={{ borderTop: "3px double #000", margin: "5px 16px 7px" }} />
 
               {/* ── PAYMENT ── */}
-              <div className="px-5" style={{ fontSize: "10px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}>
-                  <span style={{ color: "#666" }}>Payment Method</span>
-                  <span style={{ fontWeight: 700, textTransform: "uppercase" }}>{tx?.paymentMethod}</span>
+              <div className="px-5" style={{ fontSize: "12px" }}>
+                <div style={S.row}>
+                  <span style={S.label}>Payment Method</span>
+                  <span style={{ fontWeight: 800, textTransform: "uppercase" }}>{tx?.paymentMethod}</span>
                 </div>
                 {tx?.momoPhone && (
-                  <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}>
-                    <span style={{ color: "#666" }}>MoMo Phone</span><span>{tx.momoPhone}</span>
+                  <div style={S.row}>
+                    <span style={S.label}>MoMo Phone</span>
+                    <span style={{ fontWeight: 600 }}>{tx.momoPhone}</span>
                   </div>
                 )}
                 {tx?.momoNetwork && (
-                  <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}>
-                    <span style={{ color: "#666" }}>Network</span><span>{tx.momoNetwork}</span>
+                  <div style={S.row}>
+                    <span style={S.label}>Network</span>
+                    <span style={{ fontWeight: 600 }}>{tx.momoNetwork}</span>
                   </div>
                 )}
                 {tx?.momoReference && (
-                  <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}>
-                    <span style={{ color: "#666" }}>Ref</span>
-                    <span style={{ fontSize: "9px", maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.momoReference}</span>
+                  <div style={S.row}>
+                    <span style={S.label}>Ref</span>
+                    <span style={{ fontSize: "11px", fontWeight: 600, maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.momoReference}</span>
                   </div>
                 )}
                 {cashInfo?.cashReceived && (
                   <>
-                    <div style={{ display: "flex", justifyContent: "space-between", margin: "2px 0" }}>
-                      <span style={{ color: "#666" }}>Cash Received</span>
-                      <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatCurrency(cashInfo.cashReceived)}</span>
+                    <div style={S.row}>
+                      <span style={S.label}>Cash Received</span>
+                      <span style={{ fontWeight: 700 }}>{formatCurrency(cashInfo.cashReceived)}</span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed #ccc", marginTop: "3px", paddingTop: "3px" }}>
-                      <span style={{ fontWeight: 600 }}>Change Given</span>
-                      <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{formatCurrency(cashInfo.changeDue ?? 0)}</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed #666", marginTop: "4px", paddingTop: "4px" }}>
+                      <span style={{ fontWeight: 800, fontSize: "13px" }}>Change Given</span>
+                      <span style={{ fontWeight: 800, fontSize: "13px" }}>{formatCurrency(cashInfo.changeDue ?? 0)}</span>
                     </div>
                   </>
                 )}
               </div>
 
               {/* ── DASHED ── */}
-              <div style={{ borderTop: "1px dashed #999", margin: "8px 16px 6px" }} />
+              <div style={{ borderTop: "1px dashed #666", margin: "9px 16px 7px" }} />
 
               {/* ── FOOTER ── */}
               <div className="px-5 pb-5 text-center">
-                <p style={{ fontSize: "10px", fontWeight: 600, marginBottom: "2px" }}>{receiptFooter}</p>
-                <p style={{ fontSize: "9px", color: "#666", marginBottom: "4px" }}>{receiptReturnPolicy}</p>
+                <p style={{ fontSize: "12px", fontWeight: 700, marginBottom: "3px" }}>{receiptFooter}</p>
+                <p style={{ fontSize: "11px", color: "#333", fontWeight: 600, marginBottom: "5px" }}>{receiptReturnPolicy}</p>
 
                 {(tx as any)?.isVoided && (
-                  <p style={{ fontSize: "9px", fontWeight: 700, border: "2px solid #000", display: "inline-block", padding: "1px 8px", letterSpacing: "2px", marginBottom: "4px" }}>
+                  <p style={{ fontSize: "12px", fontWeight: 800, border: "2.5px solid #000", display: "inline-block", padding: "2px 10px", letterSpacing: "2px", marginBottom: "5px" }}>
                     *** VOIDED ***
                   </p>
                 )}
 
-                <div style={{ borderTop: "1px solid #e0e0e0", paddingTop: "5px", marginTop: "4px" }}>
-                  <p style={{ fontSize: "8px", color: "#888" }}>This is a computer generated receipt</p>
-                  <p style={{ fontSize: "8px", color: "#888", fontWeight: 600, letterSpacing: "0.5px" }}>
+                <div style={{ borderTop: "1px solid #ccc", paddingTop: "6px", marginTop: "5px" }}>
+                  <p style={{ fontSize: "10px", color: "#555", fontWeight: 500 }}>This is a computer generated receipt</p>
+                  <p style={{ fontSize: "10px", color: "#555", fontWeight: 700, letterSpacing: "0.5px" }}>
                     {appName.toUpperCase()}
                   </p>
                 </div>

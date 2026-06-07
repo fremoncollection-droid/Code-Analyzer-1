@@ -36,13 +36,22 @@ function AuthenticatedApp() {
 
   const isCashier = user?.role === "cashier";
 
+  // Cashiers only ever see the POS — every URL renders POSPage
+  if (isCashier) {
+    return (
+      <Layout>
+        <Switch>
+          <Route path="/pos" component={POSPage} />
+          <Route component={POSPage} />
+        </Switch>
+      </Layout>
+    );
+  }
+
+  // Admin / Manager full routing
   return (
     <Layout>
       <Switch>
-        {/* Cashier: every route goes to POS */}
-        {isCashier && <Route path="/:rest*" component={POSPage} />}
-
-        {/* Admin / Manager full routing */}
         <Route path="/" component={DashboardPage} />
         <Route path="/pos" component={POSPage} />
         <Route path="/inventory" component={InventoryPage} />

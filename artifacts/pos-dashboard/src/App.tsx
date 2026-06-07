@@ -23,7 +23,6 @@ import LeadsPage from "@/pages/leads";
 import SalesManagerPage from "@/pages/sales-manager";
 import PermissionsPage from "@/pages/permissions";
 import NotFound from "@/pages/not-found";
-import { useListPermissions } from "@workspace/api-client-react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,40 +30,25 @@ const queryClient = new QueryClient({
   },
 });
 
-// Map permission moduleKey → page component
-const MODULE_ROUTES: Record<string, { path: string; component: React.ComponentType }> = {
-  inventory:    { path: "/inventory",    component: InventoryPage },
-  transactions: { path: "/transactions", component: TransactionsPage },
-  analytics:    { path: "/analytics",   component: AnalyticsPage },
-  leads:        { path: "/leads",        component: LeadsPage },
-  transfers:    { path: "/transfers",   component: TransfersPage },
-  shifts:       { path: "/shifts",      component: ShiftsPage },
-  "sales-logs": { path: "/sales-logs",  component: SalesLogsPage },
-  settings:     { path: "/settings",    component: SettingsPage },
-  display:      { path: "/display",     component: DisplayPage },
-  audit:        { path: "/audit",       component: AuditPage },
-};
-
-// Cashier routing: always has POS + any modules explicitly granted canView
+// Cashier routing: static routes so Wouter never remounts POSPage mid-session.
+// Sidebar visibility is controlled by permissions (in layout.tsx).
+// Pages that cashiers haven't been granted access to show "Access Denied" themselves.
 function CashierApp() {
-  const { data: myPerms } = useListPermissions(undefined, {
-    query: { staleTime: 60_000 },
-  } as any);
-
-  const grantedModules = (myPerms ?? [])
-    .filter((p: any) => p.canView)
-    .map((p: any) => p.module as string);
-
   return (
     <Layout>
       <Switch>
-        <Route path="/pos" component={POSPage} />
-        {grantedModules.map(mod => {
-          const r = MODULE_ROUTES[mod];
-          if (!r) return null;
-          return <Route key={mod} path={r.path} component={r.component} />;
-        })}
-        {/* Catch-all: always land on POS */}
+        <Route path="/pos"          component={POSPage} />
+        <Route path="/inventory"    component={InventoryPage} />
+        <Route path="/transactions" component={TransactionsPage} />
+        <Route path="/analytics"    component={AnalyticsPage} />
+        <Route path="/leads"        component={LeadsPage} />
+        <Route path="/transfers"    component={TransfersPage} />
+        <Route path="/shifts"       component={ShiftsPage} />
+        <Route path="/sales-logs"   component={SalesLogsPage} />
+        <Route path="/settings"     component={SettingsPage} />
+        <Route path="/display"      component={DisplayPage} />
+        <Route path="/audit"        component={AuditPage} />
+        {/* Catch-all: land on POS for any unrecognised path */}
         <Route component={POSPage} />
       </Switch>
     </Layout>

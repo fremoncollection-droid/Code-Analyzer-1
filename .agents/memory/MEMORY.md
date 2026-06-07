@@ -1,1 +1,2 @@
 - [Render deploy build sequence](render-deploy.md) — after EVERY frontend change, must rebuild pos-dashboard + copy dist + rebuild render-app server bundle.
+- [Wouter Switch remount trap](wouter-switch-remount.md) — dynamic children inside Wouter Switch (e.g. mapped routes) remount the active page and reset all local state when the array changes.

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { useBranding } from "@/lib/branding";
 import {
@@ -52,6 +52,10 @@ import {
   AlertTriangle,
   Image,
   Save,
+  Phone,
+  Mail,
+  Globe,
+  FileText,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -97,6 +101,16 @@ export default function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { refresh } = useBranding();
 
+  // Receipt layout state
+  const [receiptPhone, setReceiptPhone] = useState("");
+  const [receiptEmail, setReceiptEmail] = useState("");
+  const [receiptWebsite, setReceiptWebsite] = useState("");
+  const [receiptTagline, setReceiptTagline] = useState("");
+  const [receiptTin, setReceiptTin] = useState("");
+  const [receiptFooter, setReceiptFooter] = useState("");
+  const [receiptReturnPolicy, setReceiptReturnPolicy] = useState("");
+  const [receiptShowLogo, setReceiptShowLogo] = useState(true);
+
   // Data queries
   const { data: locations } = useListLocations();
   const { data: settings } = useGetSettings();
@@ -108,6 +122,19 @@ export default function SettingsPage() {
   const currentNhil = settings?.nhil_rate ?? "2.5";
   const currentGetFund = settings?.getfund_rate ?? "2.5";
   const currentCovid = settings?.covid_rate ?? "1";
+
+  // Seed receipt fields once when settings load
+  useEffect(() => {
+    if (!settings) return;
+    setReceiptPhone(settings.receipt_phone ?? "");
+    setReceiptEmail(settings.receipt_email ?? "");
+    setReceiptWebsite(settings.receipt_website ?? "");
+    setReceiptTagline(settings.receipt_tagline ?? "");
+    setReceiptTin(settings.receipt_tin ?? "");
+    setReceiptFooter(settings.receipt_footer ?? "");
+    setReceiptReturnPolicy(settings.receipt_return_policy ?? "");
+    setReceiptShowLogo(settings.receipt_show_logo !== "false");
+  }, [!!settings]); // run once when settings first arrive
 
   const isAdmin = user?.role === "admin";
 
@@ -717,6 +744,121 @@ export default function SettingsPage() {
                 disabled={updateSettings.isPending || (!brandName && !logoFile)}
               >
                 <Save className="w-3 h-3" /> Save Branding
+              </Button>
+            </div>
+
+            {/* Receipt Layout */}
+            <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+              <p className="text-sm font-medium flex items-center gap-2"><Receipt className="w-4 h-4" /> Receipt Layout</p>
+              <p className="text-xs text-muted-foreground">Customise what appears on every printed receipt. Leave a field blank to keep the current value.</p>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1"><Phone className="w-3 h-3" /> Business Phone</Label>
+                  <Input
+                    value={receiptPhone}
+                    onChange={(e) => setReceiptPhone(e.target.value)}
+                    placeholder="+233 XX XXX XXXX"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1"><Mail className="w-3 h-3" /> Business Email</Label>
+                  <Input
+                    value={receiptEmail}
+                    onChange={(e) => setReceiptEmail(e.target.value)}
+                    placeholder="info@example.com"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1"><Globe className="w-3 h-3" /> Website</Label>
+                  <Input
+                    value={receiptWebsite}
+                    onChange={(e) => setReceiptWebsite(e.target.value)}
+                    placeholder="www.example.com"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1"><FileText className="w-3 h-3" /> Tagline</Label>
+                  <Input
+                    value={receiptTagline}
+                    onChange={(e) => setReceiptTagline(e.target.value)}
+                    placeholder="Wholesale & Retail Sales"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">GRA / TIN Number</Label>
+                  <Input
+                    value={receiptTin}
+                    onChange={(e) => setReceiptTin(e.target.value)}
+                    placeholder="C000XXXXXX"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Show Logo on Receipt</Label>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setReceiptShowLogo(true)}
+                      className={`px-3 py-1 rounded text-xs font-medium border transition-colors ${receiptShowLogo ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}
+                    >
+                      Yes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReceiptShowLogo(false)}
+                      className={`px-3 py-1 rounded text-xs font-medium border transition-colors ${!receiptShowLogo ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}
+                    >
+                      No
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Footer Message</Label>
+                <Input
+                  value={receiptFooter}
+                  onChange={(e) => setReceiptFooter(e.target.value)}
+                  placeholder="Thank you for shopping with us!"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Return Policy Note</Label>
+                <Input
+                  value={receiptReturnPolicy}
+                  onChange={(e) => setReceiptReturnPolicy(e.target.value)}
+                  placeholder="Goods once sold are not returnable."
+                  className="h-8 text-sm"
+                />
+              </div>
+
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1"
+                disabled={updateSettings.isPending}
+                onClick={() => {
+                  updateSettings.mutate({
+                    data: {
+                      receipt_phone: receiptPhone,
+                      receipt_email: receiptEmail,
+                      receipt_website: receiptWebsite,
+                      receipt_tagline: receiptTagline,
+                      receipt_tin: receiptTin,
+                      receipt_footer: receiptFooter,
+                      receipt_return_policy: receiptReturnPolicy,
+                      receipt_show_logo: receiptShowLogo ? "true" : "false",
+                    },
+                  });
+                }}
+              >
+                <Save className="w-3 h-3" /> Save Receipt Layout
               </Button>
             </div>
           </CardContent>

@@ -22,7 +22,7 @@ export default function InventoryPage() {
   const [editItem, setEditItem] = useState<any | null>(null);
   const [form, setForm] = useState({
     name: "", sku: "", price: "", wholesalePrice1: "", wholesalePrice2: "",
-    cost: "", quantity: "1", minQuantity: "5", categoryId: "", unitId: "", shelfId: "", unit: "piece",
+    cost: "", quantity: "0", minQuantity: "5", categoryId: "", unitId: "", shelfId: "", unit: "piece",
   });
 
   const { data: inventory, isLoading } = useListInventory({
@@ -40,7 +40,7 @@ export default function InventoryPage() {
   function invalidate() { qc.invalidateQueries({ queryKey: ["/api/inventory"] }); }
   function openCreate() {
     setEditItem(null);
-    setForm({ name: "", sku: "", price: "", wholesalePrice1: "", wholesalePrice2: "", cost: "", quantity: "1", minQuantity: "5", categoryId: "", unitId: "", shelfId: "", unit: "piece" });
+    setForm({ name: "", sku: "", price: "", wholesalePrice1: "", wholesalePrice2: "", cost: "", quantity: "0", minQuantity: "5", categoryId: "", unitId: "", shelfId: "", unit: "piece" });
     setDialogOpen(true);
   }
   function openEdit(item: any) {

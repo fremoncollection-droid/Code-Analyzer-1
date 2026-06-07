@@ -11,7 +11,7 @@ import {
   Users, ShieldCheck, ClipboardList, Building2, ShoppingBag, Monitor,
   Target, BarChart3, Shield
 } from "lucide-react";
-import { useListLocations } from "@workspace/api-client-react";
+import { useListLocations, useListPermissions } from "@workspace/api-client-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,22 +19,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const navItems = [
-  { path: "/", icon: LayoutDashboard, label: "Dashboard", roles: ["admin", "manager"] },
-  { path: "/pos", icon: ShoppingCart, label: "Point of Sale" },
-  { path: "/inventory", icon: Package, label: "Inventory", roles: ["admin", "manager"] },
-  { path: "/transactions", icon: CreditCard, label: "Transactions", roles: ["admin", "manager"] },
-  { path: "/analytics", icon: BarChart2, label: "Analytics", roles: ["admin", "manager"] },
-  { path: "/leads", icon: Target, label: "My Leads", roles: ["admin", "manager"] },
-  { path: "/sales-manager", icon: BarChart3, label: "Sales Manager", roles: ["manager", "admin"] },
-  { path: "/transfers", icon: ArrowLeftRight, label: "Transfers", roles: ["admin", "manager"] },
-  { path: "/shifts", icon: Calendar, label: "Shifts", roles: ["admin", "manager"] },
-  { path: "/cashiers", icon: Users, label: "Cashiers", roles: ["admin", "manager"] },
-  { path: "/audit", icon: ShieldCheck, label: "Audit", roles: ["admin", "manager"] },
-  { path: "/sales-logs", icon: ClipboardList, label: "Sales Logs", roles: ["admin", "manager"] },
-  { path: "/permissions", icon: Shield, label: "Permissions", roles: ["admin"] },
-  { path: "/settings", icon: Settings, label: "Settings", roles: ["admin", "manager"] },
-  { path: "/display", icon: Monitor, label: "Display", roles: ["admin", "manager"] },
+// Full nav definition — every item has a moduleKey so permissions can unlock it for cashiers
+const NAV_ITEMS = [
+  { path: "/",            icon: LayoutDashboard, label: "Dashboard",      roles: ["admin", "manager"] },
+  { path: "/pos",         icon: ShoppingCart,    label: "Point of Sale",  moduleKey: "pos" },
+  { path: "/inventory",   icon: Package,         label: "Inventory",      roles: ["admin", "manager"], moduleKey: "inventory" },
+  { path: "/transactions",icon: CreditCard,      label: "Transactions",   roles: ["admin", "manager"], moduleKey: "transactions" },
+  { path: "/analytics",   icon: BarChart2,       label: "Analytics",      roles: ["admin", "manager"], moduleKey: "analytics" },
+  { path: "/leads",       icon: Target,          label: "My Leads",       roles: ["admin", "manager"], moduleKey: "leads" },
+  { path: "/sales-manager",icon: BarChart3,      label: "Sales Manager",  roles: ["manager", "admin"] },
+  { path: "/transfers",   icon: ArrowLeftRight,  label: "Transfers",      roles: ["admin", "manager"], moduleKey: "transfers" },
+  { path: "/shifts",      icon: Calendar,        label: "Shifts",         roles: ["admin", "manager"], moduleKey: "shifts" },
+  { path: "/cashiers",    icon: Users,           label: "Cashiers",       roles: ["admin", "manager"] },
+  { path: "/audit",       icon: ShieldCheck,     label: "Audit",          roles: ["admin", "manager"], moduleKey: "audit" },
+  { path: "/sales-logs",  icon: ClipboardList,   label: "Sales Logs",     roles: ["admin", "manager"], moduleKey: "sales-logs" },
+  { path: "/permissions", icon: Shield,          label: "Permissions",    roles: ["admin"] },
+  { path: "/settings",    icon: Settings,        label: "Settings",       roles: ["admin", "manager"], moduleKey: "settings" },
+  { path: "/display",     icon: Monitor,         label: "Display",        roles: ["admin", "manager"], moduleKey: "display" },
 ];
 
 function ModeToggle() {
@@ -77,15 +78,32 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { data: locations } = useListLocations();
 
+  const isCashier = user?.role === "cashier";
+
+  // Cashiers: fetch their own permissions to unlock extra sidebar items
+  const { data: myPerms } = useListPermissions(undefined, {
+    query: { enabled: isCashier, staleTime: 60_000 },
+  } as any);
+  const grantedModules = new Set<string>(
+    isCashier ? (myPerms ?? []).filter((p: any) => p.canView).map((p: any) => p.module) : []
+  );
+
   const selectedLocation = locations?.find(l => l.id === selectedLocationId);
   const canSwitchLocation = user?.role === "admin" || user?.role === "manager";
 
-  const appName = branding.isLoading ? "MirrorTech" : branding.appName.split(" ")[0] || "MirrorTech";
-  const appSub = branding.isLoading ? "POS System" : branding.appName.split(" ").slice(1).join(" ") || "POS";
+  function isNavVisible(item: (typeof NAV_ITEMS)[number]) {
+    if (isCashier) {
+      // Cashiers always see POS; see other items only if explicitly granted canView
+      if (item.path === "/pos") return true;
+      return item.moduleKey ? grantedModules.has(item.moduleKey) : false;
+    }
+    // Admin / manager: role-based (no roles = visible to all)
+    if (item.roles && !item.roles.includes(user?.role ?? "")) return false;
+    return true;
+  }
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -155,8 +173,9 @@ export default function Layout({ children }: { children: ReactNode }) {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
-          {navItems.map(({ path, icon: Icon, label, roles }) => {
-            if (roles && !roles.includes(user?.role ?? "")) return null;
+          {NAV_ITEMS.map(item => {
+            if (!isNavVisible(item)) return null;
+            const { path, icon: Icon, label } = item;
             const active = location === path || (path !== "/" && location.startsWith(path));
             return (
               <Link key={path} href={path}>

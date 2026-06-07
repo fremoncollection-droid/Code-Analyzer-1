@@ -23,6 +23,7 @@ import LeadsPage from "@/pages/leads";
 import SalesManagerPage from "@/pages/sales-manager";
 import PermissionsPage from "@/pages/permissions";
 import NotFound from "@/pages/not-found";
+import { useListPermissions } from "@workspace/api-client-react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,25 +31,48 @@ const queryClient = new QueryClient({
   },
 });
 
-function AuthenticatedApp() {
-  const { isAuthenticated, user } = useAuth();
-  if (!isAuthenticated) return <LoginPage />;
+// Map permission moduleKey → page component
+const MODULE_ROUTES: Record<string, { path: string; component: React.ComponentType }> = {
+  inventory:    { path: "/inventory",    component: InventoryPage },
+  transactions: { path: "/transactions", component: TransactionsPage },
+  analytics:    { path: "/analytics",   component: AnalyticsPage },
+  leads:        { path: "/leads",        component: LeadsPage },
+  transfers:    { path: "/transfers",   component: TransfersPage },
+  shifts:       { path: "/shifts",      component: ShiftsPage },
+  "sales-logs": { path: "/sales-logs",  component: SalesLogsPage },
+  settings:     { path: "/settings",    component: SettingsPage },
+  display:      { path: "/display",     component: DisplayPage },
+  audit:        { path: "/audit",       component: AuditPage },
+};
 
-  const isCashier = user?.role === "cashier";
+// Cashier routing: always has POS + any modules explicitly granted canView
+function CashierApp() {
+  const { data: myPerms } = useListPermissions(undefined, {
+    query: { staleTime: 60_000 },
+  } as any);
 
-  // Cashiers only ever see the POS — every URL renders POSPage
-  if (isCashier) {
-    return (
-      <Layout>
-        <Switch>
-          <Route path="/pos" component={POSPage} />
-          <Route component={POSPage} />
-        </Switch>
-      </Layout>
-    );
-  }
+  const grantedModules = (myPerms ?? [])
+    .filter((p: any) => p.canView)
+    .map((p: any) => p.module as string);
 
-  // Admin / Manager full routing
+  return (
+    <Layout>
+      <Switch>
+        <Route path="/pos" component={POSPage} />
+        {grantedModules.map(mod => {
+          const r = MODULE_ROUTES[mod];
+          if (!r) return null;
+          return <Route key={mod} path={r.path} component={r.component} />;
+        })}
+        {/* Catch-all: always land on POS */}
+        <Route component={POSPage} />
+      </Switch>
+    </Layout>
+  );
+}
+
+// Admin / Manager: full routing
+function StaffApp() {
   return (
     <Layout>
       <Switch>
@@ -71,6 +95,13 @@ function AuthenticatedApp() {
       </Switch>
     </Layout>
   );
+}
+
+function AuthenticatedApp() {
+  const { isAuthenticated, user } = useAuth();
+  if (!isAuthenticated) return <LoginPage />;
+  if (user?.role === "cashier") return <CashierApp />;
+  return <StaffApp />;
 }
 
 function App() {

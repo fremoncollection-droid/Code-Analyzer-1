@@ -363,7 +363,7 @@ app.post("/api/transactions", authenticateToken, async (req, res) => {
     if (item.itemId) await db.execute(sql`UPDATE inventory SET quantity = GREATEST(0, quantity - ${item.quantity}) WHERE id = ${item.itemId}`);
   }
   for (const item of items) {
-    await db.insert(salesLogsTable).values({ salespersonId: cashierId, salesMode: sm, action: "sale_item", details: `Sold ${item.quantity} x ${item.name}`, productId: item.itemId, orderId: tx.id, quantity: item.quantity, unitPrice: item.price, total: item.total });
+    await db.insert(salesLogsTable).values({ salespersonId: cashierId, salesMode: sm, action: "sale", details: `Sold ${item.quantity} x ${item.name}`, productId: item.itemId, orderId: tx.id, quantity: item.quantity, unitPrice: item.price, total: item.total });
   }
   res.status(201).json(tx);
 });
@@ -425,6 +425,25 @@ app.get("/api/analytics/summary", authenticateToken, async (req, res) => {
   const totalRevenue = parseFloat(summary.totalRevenue ?? "0");
   const totalTx = summary.totalTransactions ?? 0;
   res.json({ totalSales: totalRevenue, totalRevenue: totalRevenue.toFixed(2), totalTransactions: totalTx, averageOrderValue: totalTx > 0 ? (totalRevenue / totalTx).toFixed(2) : "0.00", cashSales: parseFloat(summary.cashSales ?? "0").toFixed(2), momoSales: parseFloat(summary.momoSales ?? "0").toFixed(2), cardSales: parseFloat(summary.cardSales ?? "0").toFixed(2), net30Sales: parseFloat(summary.net30Sales ?? "0").toFixed(2), poSales: parseFloat(summary.poSales ?? "0").toFixed(2), retailSales: parseFloat(summary.retailSales ?? "0").toFixed(2), wholesaleSales: parseFloat(summary.wholesaleSales ?? "0").toFixed(2), lowStockItems: lowStockItems ?? 0 });
+});
+
+app.get("/api/sales-logs", authenticateToken, async (req, res) => {
+  const { salespersonId, salesMode, action, startDate, endDate, limit = "100", offset = "0" } = req.query as Record<string, string>;
+  const conditions: any[] = [];
+  if (salespersonId) conditions.push(eq(salesLogsTable.salespersonId, salespersonId));
+  if (salesMode) conditions.push(eq(salesLogsTable.salesMode, salesMode));
+  if (action) conditions.push(eq(salesLogsTable.action, action));
+  if (startDate) conditions.push(gte(salesLogsTable.createdAt, new Date(startDate)));
+  if (endDate) conditions.push(lte(salesLogsTable.createdAt, new Date(endDate)));
+  const logs = await db
+    .select({ id: salesLogsTable.id, salespersonId: salesLogsTable.salespersonId, salespersonName: usersTable.username, salesMode: salesLogsTable.salesMode, action: salesLogsTable.action, details: salesLogsTable.details, productId: salesLogsTable.productId, orderId: salesLogsTable.orderId, quantity: salesLogsTable.quantity, unitPrice: salesLogsTable.unitPrice, total: salesLogsTable.total, createdAt: salesLogsTable.createdAt })
+    .from(salesLogsTable)
+    .leftJoin(usersTable, eq(salesLogsTable.salespersonId, usersTable.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(salesLogsTable.createdAt))
+    .limit(parseInt(limit))
+    .offset(parseInt(offset));
+  res.json(logs);
 });
 
 app.get("/api/analytics/sales-by-day", authenticateToken, async (req, res) => {

@@ -168,7 +168,7 @@ router.post("/", authenticateToken, async (req, res) => {
     await db.insert(salesLogsTable).values({
       salespersonId: cashierId,
       salesMode,
-      action: "sale_item",
+      action: "sale",
       details: `Sold ${item.quantity} x ${item.name}`,
       productId: item.itemId,
       orderId: tx.id,

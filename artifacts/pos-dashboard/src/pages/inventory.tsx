@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useListInventory, useListCategories, useListLocations, useListUnits, useListShelves, useCreateInventoryItem, useUpdateInventoryItem, useDeleteInventoryItem } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency } from "@/lib/utils";
@@ -11,13 +11,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Edit2, Trash2, AlertTriangle, Package, TrendingUp, DollarSign, ShoppingBag, BarChart2 } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, AlertTriangle, Package, TrendingUp, DollarSign, ShoppingBag, BarChart2, X, Filter } from "lucide-react";
 
 export default function InventoryPage() {
   const { selectedLocationId } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("__all__");
+  const [missingFilter, setMissingFilter] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState<any | null>(null);
   const [form, setForm] = useState({
@@ -69,8 +71,28 @@ export default function InventoryPage() {
     else createItem.mutate({ data: payload });
   }
 
-  const items = inventory ?? [];
-  const lowStockItems = items.filter(i => i.quantity <= (i.minQuantity ?? 0));
+  const allItems = inventory ?? [];
+  const lowStockItems = allItems.filter(i => i.quantity <= (i.minQuantity ?? 0));
+
+  const MISSING_OPTIONS = [
+    { key: "category",   label: "No Category" },
+    { key: "cost",       label: "No Cost Price" },
+    { key: "sell",       label: "No Sell Price" },
+    { key: "wholesale",  label: "No Wholesale" },
+    { key: "stock",      label: "Zero Stock" },
+  ];
+
+  const items = useMemo(() => {
+    let list = allItems;
+    if (categoryFilter !== "__all__")
+      list = list.filter(i => i.categoryId === categoryFilter);
+    if (missingFilter === "category")  list = list.filter(i => !i.categoryId);
+    if (missingFilter === "cost")      list = list.filter(i => !i.cost || parseFloat(i.cost) === 0);
+    if (missingFilter === "sell")      list = list.filter(i => !i.price || parseFloat(i.price) === 0);
+    if (missingFilter === "wholesale") list = list.filter(i => !i.wholesalePrice1);
+    if (missingFilter === "stock")     list = list.filter(i => (i.quantity ?? 0) === 0);
+    return list;
+  }, [allItems, categoryFilter, missingFilter]);
 
   // Compute totals
   const totalSellingValue = items.reduce((sum, i) => sum + parseFloat(i.price ?? "0") * (i.quantity ?? 0), 0);
@@ -85,7 +107,11 @@ export default function InventoryPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Inventory</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{items.length} items</p>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {(categoryFilter !== "__all__" || missingFilter)
+              ? <>{items.length} of {allItems.length} items</>
+              : <>{allItems.length} items</>}
+          </p>
         </div>
         <Button onClick={openCreate} className="gap-2">
           <Plus className="w-4 h-4" /> Add Item
@@ -148,10 +174,57 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search inventory..." className="pl-9" />
+      {/* Search + Filters */}
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search inventory..." className="pl-9" />
+          </div>
+          {/* Category filter */}
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-44 shrink-0">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All Categories</SelectItem>
+              {categories?.map(c => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Missing data filter chips */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+            <Filter className="w-3.5 h-3.5" /> Missing:
+          </div>
+          {MISSING_OPTIONS.map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => setMissingFilter(missingFilter === opt.key ? null : opt.key)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                missingFilter === opt.key
+                  ? "bg-destructive/10 border-destructive/40 text-destructive"
+                  : "bg-muted/50 border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+              }`}
+            >
+              {opt.label}
+              {missingFilter === opt.key && (
+                <X className="inline w-3 h-3 ml-1 -mr-0.5" />
+              )}
+            </button>
+          ))}
+          {(categoryFilter !== "__all__" || missingFilter) && (
+            <button
+              onClick={() => { setCategoryFilter("__all__"); setMissingFilter(null); }}
+              className="px-2.5 py-1 rounded-full text-xs font-medium border border-border text-muted-foreground hover:text-foreground ml-auto"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Table */}

@@ -170,6 +170,10 @@ export default function SettingsPage() {
         setLocForm({ name: "", address: "", phone: "" });
         toast({ title: "Location updated" });
       },
+      onError: (err: any) => {
+        const msg = err?.response?.data?.error ?? err?.message ?? "Unknown error";
+        toast({ title: "Failed to update location", description: msg, variant: "destructive" });
+      },
     },
   });
 
@@ -1148,15 +1152,21 @@ export default function SettingsPage() {
             <Button variant="outline" onClick={() => { setLocationDialog(false); setLocEditing(null); setLocForm({ name: "", address: "", phone: "" }); }}>Cancel</Button>
             {locEditing ? (
               <Button
-                onClick={() => updateLocation.mutate({ id: locEditing, data: { name: locForm.name, address: locForm.address || undefined, phone: locForm.phone || undefined } })}
-                disabled={!locForm.name || updateLocation.isPending}
+                onClick={() => {
+                  if (!locEditing || !locForm.name.trim()) return;
+                  updateLocation.mutate({ id: locEditing, data: { name: locForm.name.trim(), address: locForm.address.trim() || undefined, phone: locForm.phone.trim() || undefined } });
+                }}
+                disabled={!locForm.name.trim() || updateLocation.isPending}
               >
                 {updateLocation.isPending ? "Saving..." : "Save Changes"}
               </Button>
             ) : (
               <Button
-                onClick={() => createLocation.mutate({ data: { name: locForm.name, address: locForm.address || undefined, phone: locForm.phone || undefined } })}
-                disabled={!locForm.name || createLocation.isPending}
+                onClick={() => {
+                  if (!locForm.name.trim()) return;
+                  createLocation.mutate({ data: { name: locForm.name.trim(), address: locForm.address.trim() || undefined, phone: locForm.phone.trim() || undefined } });
+                }}
+                disabled={!locForm.name.trim() || createLocation.isPending}
               >
                 {createLocation.isPending ? "Creating..." : "Create Location"}
               </Button>

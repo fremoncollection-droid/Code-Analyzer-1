@@ -649,8 +649,7 @@ export default function POSPage() {
         {isWholesale && (
           <div className="shrink-0 px-4 py-3 border-b border-border bg-blue-50/50">
             <Label className="text-xs text-blue-700 flex items-center gap-1 mb-1.5">
-              <Building2 className="w-3 h-3" /> Business Customer
-              <span className="text-destructive">*</span>
+              <Building2 className="w-3 h-3" /> Business Customer <span className="text-muted-foreground font-normal">(optional)</span>
             </Label>
             <div className="relative">
               <Input
@@ -800,7 +799,7 @@ export default function POSPage() {
           {/* Pay / F12 */}
           <Button
             className={cn("w-full h-12 text-base font-bold gap-2", isWholesale && "bg-blue-600 hover:bg-blue-700")}
-            disabled={cartItems === 0 || createTx.isPending || (isWholesale && !selectedCustomerId)}
+            disabled={cartItems === 0 || createTx.isPending}
             onClick={() => setCheckoutOpen(true)}
           >
             {createTx.isPending ? "Processing..." : (
@@ -811,9 +810,6 @@ export default function POSPage() {
               </>
             )}
           </Button>
-          {isWholesale && !selectedCustomerId && (
-            <p className="text-xs text-destructive text-center">Select a business customer to proceed</p>
-          )}
         </div>
       </div>
 
@@ -909,12 +905,9 @@ export default function POSPage() {
                 </button>
               ))}
             </div>
-            <Button className={cn("w-full h-12 text-base font-bold gap-2", isWholesale && "bg-blue-600 hover:bg-blue-700")} disabled={cartItems === 0 || createTx.isPending || (isWholesale && !selectedCustomerId)} onClick={() => { setMobileCartOpen(false); setCheckoutOpen(true); }}>
+            <Button className={cn("w-full h-12 text-base font-bold gap-2", isWholesale && "bg-blue-600 hover:bg-blue-700")} disabled={cartItems === 0 || createTx.isPending} onClick={() => { setMobileCartOpen(false); setCheckoutOpen(true); }}>
               {createTx.isPending ? "Processing..." : <><span>Pay</span><span className="tabular-nums">{formatCurrency(total)}</span></>}
             </Button>
-            {isWholesale && !selectedCustomerId && (
-              <p className="text-xs text-destructive text-center">Select a business customer</p>
-            )}
           </div>
         </div>
       </div>
@@ -943,19 +936,31 @@ export default function POSPage() {
 
             {/* Customer */}
             {isWholesale ? (
-              <div className="space-y-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <Label className="text-xs text-blue-700 flex items-center gap-1">
-                  <Building2 className="w-3 h-3" /> Business Customer
-                </Label>
-                {selectedCustomer ? (
-                  <div className="flex items-center gap-1.5 text-sm text-blue-800">
-                    <CheckCircle2 className="w-3 h-3" />
-                    <span className="font-medium">{selectedCustomer.username}</span>
-                    <Badge variant="outline" className="text-[10px]">Tier {(selectedCustomer as any).wholesaleTier ?? 1}</Badge>
+              <div className="space-y-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="space-y-1">
+                  <Label className="text-xs text-blue-700 flex items-center gap-1">
+                    <Building2 className="w-3 h-3" /> Business Customer <span className="text-muted-foreground font-normal">(optional)</span>
+                  </Label>
+                  {selectedCustomer ? (
+                    <div className="flex items-center gap-1.5 text-sm text-blue-800">
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span className="font-medium">{selectedCustomer.username}</span>
+                      <Badge variant="outline" className="text-[10px]">Tier {(selectedCustomer as any).wholesaleTier ?? 1}</Badge>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No business customer linked</p>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-blue-700">Customer Name</Label>
+                    <Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Name" className="h-8 text-sm bg-white" />
                   </div>
-                ) : (
-                  <p className="text-sm text-destructive">No customer selected — required for wholesale</p>
-                )}
+                  <div className="space-y-1">
+                    <Label className="text-xs text-blue-700">Customer Phone</Label>
+                    <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="+233..." className="h-8 text-sm bg-white" />
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
@@ -1074,7 +1079,7 @@ export default function POSPage() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => { setCheckoutOpen(false); setMomoRef(null); setCashReceived(""); }}>Cancel</Button>
-            <Button className={cn(isWholesale && "bg-blue-600 hover:bg-blue-700")} onClick={handleCheckout} disabled={createTx.isPending || (paymentMethod === "momo" && !momoConfirmed) || (isWholesale && !selectedCustomerId) || (paymentMethod === "cash" && insufficientCash)}>
+            <Button className={cn(isWholesale && "bg-blue-600 hover:bg-blue-700")} onClick={handleCheckout} disabled={createTx.isPending || (paymentMethod === "momo" && !momoConfirmed) || (paymentMethod === "cash" && insufficientCash)}>
               {createTx.isPending ? "Processing..." : "Complete Sale"}
             </Button>
           </DialogFooter>

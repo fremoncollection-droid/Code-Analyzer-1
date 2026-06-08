@@ -99,15 +99,15 @@ router.post("/", authenticateToken, async (req, res) => {
     wholesalePrice1?: string; wholesalePrice2?: string; cost?: string;
     quantity?: number; minQuantity?: number; locationId?: string; categoryId?: string; unitId?: string; shelfId?: string; unit?: string;
   };
-  if (!body.name || !body.price) {
-    res.status(400).json({ error: "name and price required" });
+  if (!body.name) {
+    res.status(400).json({ error: "name required" });
     return;
   }
   const [item] = await db.insert(inventoryTable).values({
     name: body.name,
     sku: body.sku,
     description: body.description,
-    price: body.price,
+    price: body.price || "0",
     wholesalePrice1: body.wholesalePrice1,
     wholesalePrice2: body.wholesalePrice2,
     cost: body.cost,

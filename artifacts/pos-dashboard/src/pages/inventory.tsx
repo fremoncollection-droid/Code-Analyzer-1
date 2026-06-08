@@ -50,7 +50,21 @@ export default function InventoryPage() {
   }
   function closeDialog() { setDialogOpen(false); setEditItem(null); }
   function handleSubmit() {
-    const payload = { name: form.name, sku: form.sku || undefined, price: form.price, wholesalePrice1: form.wholesalePrice1 || undefined, wholesalePrice2: form.wholesalePrice2 || undefined, cost: form.cost || undefined, quantity: parseInt(form.quantity), minQuantity: parseInt(form.minQuantity), categoryId: form.categoryId || undefined, unitId: form.unitId || undefined, shelfId: form.shelfId || undefined, unit: form.unit, locationId: selectedLocationId ?? undefined };
+    const payload = {
+      name: form.name,
+      sku: form.sku || undefined,
+      price: form.price || "0",
+      wholesalePrice1: form.wholesalePrice1 || undefined,
+      wholesalePrice2: form.wholesalePrice2 || undefined,
+      cost: form.cost || undefined,
+      quantity: parseInt(form.quantity) || 0,
+      minQuantity: parseInt(form.minQuantity) || 0,
+      categoryId: form.categoryId || undefined,
+      unitId: form.unitId || undefined,
+      shelfId: form.shelfId || undefined,
+      unit: form.unit,
+      locationId: selectedLocationId ?? undefined,
+    };
     if (editItem) updateItem.mutate({ id: editItem.id, data: payload });
     else createItem.mutate({ data: payload });
   }
@@ -279,9 +293,10 @@ export default function InventoryPage() {
               </div>
               <div className="space-y-1">
                 <Label>Unit</Label>
-                <Select value={form.unitId} onValueChange={v => setForm(f => ({ ...f, unitId: v }))}>
+                <Select value={form.unitId || "__none__"} onValueChange={v => setForm(f => ({ ...f, unitId: v === "__none__" ? "" : v }))}>
                   <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">— None —</SelectItem>
                     {units?.map(u => <SelectItem key={u.id} value={u.id}>{u.name} ({u.abbreviation})</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -296,7 +311,7 @@ export default function InventoryPage() {
                     <Input type="number" step="0.01" value={form.cost} onChange={e => setForm(f => ({ ...f, cost: e.target.value }))} placeholder="0.00" />
                   </div>
                   <div className="space-y-1">
-                    <Label>Selling Price (₵) *</Label>
+                    <Label>Selling Price (₵)</Label>
                     <Input type="number" step="0.01" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" />
                   </div>
                 </div>
@@ -341,18 +356,20 @@ export default function InventoryPage() {
               </div>
               <div className="space-y-1">
                 <Label>Category</Label>
-                <Select value={form.categoryId} onValueChange={v => setForm(f => ({ ...f, categoryId: v }))}>
+                <Select value={form.categoryId || "__none__"} onValueChange={v => setForm(f => ({ ...f, categoryId: v === "__none__" ? "" : v }))}>
                   <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">— None —</SelectItem>
                     {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1">
                 <Label>Shelf</Label>
-                <Select value={form.shelfId} onValueChange={v => setForm(f => ({ ...f, shelfId: v }))}>
+                <Select value={form.shelfId || "__none__"} onValueChange={v => setForm(f => ({ ...f, shelfId: v === "__none__" ? "" : v }))}>
                   <SelectTrigger><SelectValue placeholder="Select shelf" /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">— None —</SelectItem>
                     {shelves?.map(s => <SelectItem key={s.id} value={s.id}>{s.name} ({s.zone})</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -361,7 +378,7 @@ export default function InventoryPage() {
           </div>
           <DialogFooter className="px-6 py-4 border-t shrink-0">
             <Button variant="outline" onClick={closeDialog}>Cancel</Button>
-            <Button onClick={handleSubmit} disabled={!form.name || !form.price || createItem.isPending || updateItem.isPending}>
+            <Button onClick={handleSubmit} disabled={!form.name.trim() || createItem.isPending || updateItem.isPending}>
               {editItem ? "Save Changes" : "Add Item"}
             </Button>
           </DialogFooter>

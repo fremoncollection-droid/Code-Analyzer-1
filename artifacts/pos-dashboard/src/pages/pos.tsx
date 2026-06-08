@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useListInventory, useListCategories, useListLocations, useCreateTransaction, useInitiateMoMo, useGetMoMoStatus, useGetSettings, useGetActiveShift, useOpenShift, useListUsers, useCreateSalesLog } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useSalesMode } from "@/lib/sales-mode";
@@ -85,6 +85,7 @@ export default function POSPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "momo" | "card">("cash");
+  const [checkoutTier, setCheckoutTier] = useState<1 | 2>(1);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [momoPhone, setMomoPhone] = useState("");
   const [momoNetwork, setMomoNetwork] = useState<"MTN" | "Telecel">("MTN");
@@ -212,8 +213,32 @@ export default function POSPage() {
   const total = subtotal + taxAmount;
   const momoConfirmed = momoStatus?.status === "successful";
   const cashReceivedNum = parseFloat(cashReceived) || 0;
-  const changeDue = Math.max(0, cashReceivedNum - total);
-  const insufficientCash = cashReceived === "" || cashReceivedNum < total;
+
+  // Checkout repricing — apply checkoutTier to cart items using live inventory prices
+  const checkoutCart = useMemo(() => {
+    if (!isWholesale) return cart;
+    return cart.map(cartItem => {
+      const invItem = (inventory as any[])?.find((i: any) => i.id === cartItem.itemId);
+      if (!invItem) return cartItem;
+      let price = parseFloat(invItem.price);
+      if (checkoutTier === 2 && invItem.wholesalePrice2) price = parseFloat(invItem.wholesalePrice2);
+      else if (invItem.wholesalePrice1) price = parseFloat(invItem.wholesalePrice1);
+      return { ...cartItem, price };
+    });
+  }, [cart, checkoutTier, inventory, isWholesale]);
+  const checkoutSubtotal = checkoutCart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const checkoutTaxBreakdown = computeTaxBreakdown(checkoutSubtotal, taxRates);
+  const checkoutTaxAmount = checkoutTaxBreakdown.totalTax;
+  const checkoutTotal = checkoutSubtotal + checkoutTaxAmount;
+  const changeDue = Math.max(0, cashReceivedNum - checkoutTotal);
+  const insufficientCash = cashReceived === "" || cashReceivedNum < checkoutTotal;
+
+  // Sync checkoutTier when checkout opens
+  useEffect(() => {
+    if (checkoutOpen) {
+      setCheckoutTier(isWholesale ? (((selectedCustomer as any)?.wholesaleTier ?? 1) as 1 | 2) : 1);
+    }
+  }, [checkoutOpen]);
 
   // Get wholesale tier price for an item
   function getItemPrice(item: any): number {
@@ -375,19 +400,19 @@ export default function POSPage() {
     return {
       locationId: selectedLocationId!,
       shiftId: activeShift?.id ?? undefined,
-      items: cart.map(i => ({ itemId: i.itemId, name: i.name, quantity: i.quantity, price: i.price.toFixed(2), total: (i.price * i.quantity).toFixed(2) })),
-      subtotal: subtotal.toFixed(2),
-      taxAmount: taxAmount.toFixed(2),
+      items: checkoutCart.map(i => ({ itemId: i.itemId, name: i.name, quantity: i.quantity, price: i.price.toFixed(2), total: (i.price * i.quantity).toFixed(2) })),
+      subtotal: checkoutSubtotal.toFixed(2),
+      taxAmount: checkoutTaxAmount.toFixed(2),
       taxBreakdown: {
-        vat: taxBreakdown.vat.toFixed(2),
-        nhil: taxBreakdown.nhil.toFixed(2),
-        getFund: taxBreakdown.getFund.toFixed(2),
-        covid: taxBreakdown.covid.toFixed(2),
+        vat: checkoutTaxBreakdown.vat.toFixed(2),
+        nhil: checkoutTaxBreakdown.nhil.toFixed(2),
+        getFund: checkoutTaxBreakdown.getFund.toFixed(2),
+        covid: checkoutTaxBreakdown.covid.toFixed(2),
       },
-      total: total.toFixed(2),
+      total: checkoutTotal.toFixed(2),
       paymentMethod,
       salesMode,
-      wholesaleTier: isWholesale ? ((selectedCustomer as any)?.wholesaleTier ?? 1) : undefined,
+      wholesaleTier: isWholesale ? checkoutTier : undefined,
       customerId: selectedCustomerId ?? undefined,
       momoPhone: paymentMethod === "momo" ? momoPhone : undefined,
       momoNetwork: paymentMethod === "momo" ? momoNetwork : undefined,
@@ -917,13 +942,13 @@ export default function POSPage() {
           <div className="space-y-4 py-2">
             {/* Bill Summary */}
             <div className="bg-muted rounded-lg p-3 space-y-1 text-sm">
-              <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span className="tabular-nums">{formatCurrency(subtotal)}</span></div>
-              <div className="flex justify-between text-muted-foreground"><span>VAT ({(taxRates.vat * 100).toFixed(1)}%)</span><span className="tabular-nums">{formatCurrency(taxBreakdown.vat)}</span></div>
-              {taxBreakdown.nhil > 0 && <div className="flex justify-between text-muted-foreground"><span>NHIL ({(taxRates.nhil * 100).toFixed(1)}%)</span><span className="tabular-nums">{formatCurrency(taxBreakdown.nhil)}</span></div>}
-              {taxBreakdown.getFund > 0 && <div className="flex justify-between text-muted-foreground"><span>GETFund ({(taxRates.getFund * 100).toFixed(1)}%)</span><span className="tabular-nums">{formatCurrency(taxBreakdown.getFund)}</span></div>}
-              {taxBreakdown.covid > 0 && <div className="flex justify-between text-muted-foreground"><span>COVID ({(taxRates.covid * 100).toFixed(1)}%)</span><span className="tabular-nums">{formatCurrency(taxBreakdown.covid)}</span></div>}
+              <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span className="tabular-nums">{formatCurrency(checkoutSubtotal)}</span></div>
+              <div className="flex justify-between text-muted-foreground"><span>VAT ({(taxRates.vat * 100).toFixed(1)}%)</span><span className="tabular-nums">{formatCurrency(checkoutTaxBreakdown.vat)}</span></div>
+              {checkoutTaxBreakdown.nhil > 0 && <div className="flex justify-between text-muted-foreground"><span>NHIL ({(taxRates.nhil * 100).toFixed(1)}%)</span><span className="tabular-nums">{formatCurrency(checkoutTaxBreakdown.nhil)}</span></div>}
+              {checkoutTaxBreakdown.getFund > 0 && <div className="flex justify-between text-muted-foreground"><span>GETFund ({(taxRates.getFund * 100).toFixed(1)}%)</span><span className="tabular-nums">{formatCurrency(checkoutTaxBreakdown.getFund)}</span></div>}
+              {checkoutTaxBreakdown.covid > 0 && <div className="flex justify-between text-muted-foreground"><span>COVID ({(taxRates.covid * 100).toFixed(1)}%)</span><span className="tabular-nums">{formatCurrency(checkoutTaxBreakdown.covid)}</span></div>}
               <Separator className="my-1" />
-              <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-primary tabular-nums">{formatCurrency(total)}</span></div>
+              <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-primary tabular-nums">{formatCurrency(checkoutTotal)}</span></div>
               <div className="text-xs text-muted-foreground mt-1">{cartItemCount} items · {paymentMethod.toUpperCase()}</div>
             </div>
 
@@ -944,16 +969,16 @@ export default function POSPage() {
                     <p className="text-xs text-muted-foreground">No business customer linked</p>
                   )}
                 </div>
-                {/* Tier pricing summary */}
+                {/* Tier selector */}
                 <div className="grid grid-cols-2 gap-2">
-                  <div className={cn("rounded-md border px-3 py-2 text-xs", selectedCustomer && ((selectedCustomer as any).wholesaleTier ?? 1) === 1 ? "bg-blue-600 text-white border-blue-600" : "bg-white border-border text-muted-foreground")}>
+                  <button type="button" onClick={() => setCheckoutTier(1)} className={cn("rounded-md border px-3 py-2 text-xs text-left transition-colors", checkoutTier === 1 ? "bg-blue-600 text-white border-blue-600" : "bg-white border-border text-muted-foreground hover:border-blue-400")}>
                     <p className="font-semibold">Tier 1</p>
                     <p className="opacity-80 mt-0.5">Standard wholesale price</p>
-                  </div>
-                  <div className={cn("rounded-md border px-3 py-2 text-xs", selectedCustomer && (selectedCustomer as any).wholesaleTier === 2 ? "bg-blue-600 text-white border-blue-600" : "bg-white border-border text-muted-foreground")}>
+                  </button>
+                  <button type="button" onClick={() => setCheckoutTier(2)} className={cn("rounded-md border px-3 py-2 text-xs text-left transition-colors", checkoutTier === 2 ? "bg-blue-600 text-white border-blue-600" : "bg-white border-border text-muted-foreground hover:border-blue-400")}>
                     <p className="font-semibold">Tier 2</p>
                     <p className="opacity-80 mt-0.5">Preferred / volume price</p>
-                  </div>
+                  </button>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
@@ -1021,7 +1046,7 @@ export default function POSPage() {
               <div className="space-y-3 p-3 bg-teal-50 rounded-lg border border-teal-200">
                 <div className="flex items-center gap-2 text-sm text-teal-700 font-medium">
                   <Banknote className="w-4 h-4" />
-                  Total due: <span className="tabular-nums font-bold">{formatCurrency(total)}</span>
+                  Total due: <span className="tabular-nums font-bold">{formatCurrency(checkoutTotal)}</span>
                 </div>
 
                 <div className="space-y-1.5">

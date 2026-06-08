@@ -27,12 +27,18 @@ interface TaxRates {
   covid: number;
 }
 
+function parseTaxRate(val: string | undefined, fallback: number): number {
+  if (val === undefined || val === null || val === "") return fallback;
+  const n = parseFloat(val);
+  return isNaN(n) ? fallback : n;
+}
+
 function getTaxRates(settings: Record<string, string> | undefined): TaxRates {
   return {
-    vat: (parseFloat(settings?.vat_rate ?? "15") || 15) / 100,
-    nhil: (parseFloat(settings?.nhil_rate ?? "2.5") || 2.5) / 100,
-    getFund: (parseFloat(settings?.getfund_rate ?? "2.5") || 2.5) / 100,
-    covid: (parseFloat(settings?.covid_rate ?? "1") || 1) / 100,
+    vat: parseTaxRate(settings?.vat_rate, 15) / 100,
+    nhil: parseTaxRate(settings?.nhil_rate, 2.5) / 100,
+    getFund: parseTaxRate(settings?.getfund_rate, 2.5) / 100,
+    covid: parseTaxRate(settings?.covid_rate, 1) / 100,
   };
 }
 
@@ -114,7 +120,7 @@ export default function POSPage() {
     locationId: selectedLocationId ?? undefined,
   });
   const { data: locations } = useListLocations();
-  const { data: settings } = useGetSettings();
+  const { data: settings } = useGetSettings({ query: { staleTime: 0 } } as any);
   const { data: allUsers } = useListUsers();
   // Wholesale customers (users with customerType = 'wholesale')
   const wholesaleCustomers = allUsers?.filter((u: any) => u.customerType === "wholesale") ?? [];

@@ -624,7 +624,7 @@ export default function POSPage() {
                       <Package className="w-6 h-6 text-muted-foreground" />
                     </div>
                     <p className="font-medium text-xs lg:text-sm leading-tight line-clamp-2">{item.name}</p>
-                    {item.unit && <p className="text-[10px] text-muted-foreground mt-0.5">{item.unit}</p>}
+                    {(item.unitName || item.unit) && <p className="text-[10px] text-muted-foreground mt-0.5">{item.unitName || item.unit}</p>}
                     <p className={cn("font-semibold text-sm lg:text-base mt-1", isWholesale ? "text-blue-600" : "text-primary")}>
                       {isWholesale ? (
                         <>

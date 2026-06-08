@@ -84,7 +84,7 @@ export default function POSPage() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "momo" | "card" | "net30" | "purchase_order">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "momo" | "card">("cash");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [momoPhone, setMomoPhone] = useState("");
   const [momoNetwork, setMomoNetwork] = useState<"MTN" | "Telecel">("MTN");
@@ -769,11 +769,7 @@ export default function POSPage() {
           {/* Payment method */}
           <div className={cn("grid gap-2", isWholesale ? "grid-cols-3" : "grid-cols-3")}>
             {(() => {
-              const methods = isWholesale ? [
-                { key: "net30" as const, icon: CreditCard, label: "Net 30" },
-                { key: "purchase_order" as const, icon: ShoppingBag, label: "Purchase Order" },
-                { key: "cash" as const, icon: Banknote, label: "Cash" },
-              ] : [
+              const methods = [
                 { key: "cash" as const, icon: Banknote, label: "Cash" },
                 { key: "momo" as const, icon: Smartphone, label: "MoMo" },
                 { key: "card" as const, icon: CreditCard, label: "Card" },
@@ -891,15 +887,11 @@ export default function POSPage() {
               <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-primary tabular-nums">{formatCurrency(total)}</span></div>
             </div>
             <div className={cn("grid gap-2", isWholesale ? "grid-cols-3" : "grid-cols-3")}>
-              {(isWholesale ? [
-                { key: "net30" as const, icon: CreditCard, label: "Net 30" },
-                { key: "purchase_order" as const, icon: ShoppingBag, label: "PO" },
-                { key: "cash" as const, icon: Banknote, label: "Cash" },
-              ] : [
+              {[
                 { key: "cash" as const, icon: Banknote, label: "Cash" },
                 { key: "momo" as const, icon: Smartphone, label: "MoMo" },
                 { key: "card" as const, icon: CreditCard, label: "Card" },
-              ]).map(({ key, icon: Icon, label }) => (
+              ].map(({ key, icon: Icon, label }) => (
                 <button key={key} onClick={() => setPaymentMethod(key)} className={cn("flex flex-col items-center gap-1 py-2 rounded-lg border text-xs font-medium min-h-[48px]", paymentMethod === key ? (isWholesale ? "border-blue-600 bg-blue-50 text-blue-600" : "border-primary bg-primary/10 text-primary") : "border-border text-muted-foreground")}>
                   <Icon className="w-4 h-4" />{label}
                 </button>
@@ -950,6 +942,17 @@ export default function POSPage() {
                   ) : (
                     <p className="text-xs text-muted-foreground">No business customer linked</p>
                   )}
+                </div>
+                {/* Tier pricing summary */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className={cn("rounded-md border px-3 py-2 text-xs", selectedCustomer && ((selectedCustomer as any).wholesaleTier ?? 1) === 1 ? "bg-blue-600 text-white border-blue-600" : "bg-white border-border text-muted-foreground")}>
+                    <p className="font-semibold">Tier 1</p>
+                    <p className="opacity-80 mt-0.5">Standard wholesale price</p>
+                  </div>
+                  <div className={cn("rounded-md border px-3 py-2 text-xs", selectedCustomer && (selectedCustomer as any).wholesaleTier === 2 ? "bg-blue-600 text-white border-blue-600" : "bg-white border-border text-muted-foreground")}>
+                    <p className="font-semibold">Tier 2</p>
+                    <p className="opacity-80 mt-0.5">Preferred / volume price</p>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
@@ -1063,16 +1066,6 @@ export default function POSPage() {
             {paymentMethod === "card" && (
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-700">
                 <div className="flex items-center gap-2"><CreditCard className="w-4 h-4" /> Process card payment for <strong className="tabular-nums">{formatCurrency(total)}</strong></div>
-              </div>
-            )}
-            {paymentMethod === "net30" && (
-              <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-200 text-sm text-indigo-700">
-                <div className="flex items-center gap-2"><CreditCard className="w-4 h-4" /> Net 30 terms — invoice due in 30 days: <strong className="tabular-nums">{formatCurrency(total)}</strong></div>
-              </div>
-            )}
-            {paymentMethod === "purchase_order" && (
-              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200 text-sm text-purple-700">
-                <div className="flex items-center gap-2"><ShoppingBag className="w-4 h-4" /> Purchase Order — customer billed on account: <strong className="tabular-nums">{formatCurrency(total)}</strong></div>
               </div>
             )}
           </div>

@@ -113,7 +113,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col transition-transform duration-200 lg:relative lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shrink-0",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}
         data-mode={isWholesale ? "wholesale" : "retail"}
@@ -224,7 +224,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Desktop header */}
-        <header className="hidden lg:flex items-center justify-between px-6 py-3 border-b border-border bg-card">
+        <header className="hidden lg:flex items-center justify-between px-6 py-3 border-b border-border bg-card sticky top-0 z-10 shrink-0">
           <div className="flex items-center gap-3">
             <span className="font-semibold text-sm">{branding.appName}</span>
           </div>
@@ -234,7 +234,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         </header>
 
         {/* Mobile header */}
-        <header className="lg:hidden flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-card">
+        <header className="lg:hidden flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-card sticky top-0 z-10 shrink-0">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} className="text-muted-foreground hover:text-foreground">
               <Menu className="w-5 h-5" />

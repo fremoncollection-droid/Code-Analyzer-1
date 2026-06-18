@@ -16,8 +16,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, Smartphone,
   Wifi, WifiOff, CheckCircle2, X, ScanBarcode, ChevronUp,
-  Package, Send, Clock, Building2, ShoppingBag
+  Package, Send, Clock, Building2, ShoppingBag, Bell, AlertTriangle, MessageCircle
 } from "lucide-react";
+import { fireStockNotification } from "@/lib/notifications";
 import ReceiptModal from "@/components/receipt-modal";
 
 interface TaxRates {
@@ -81,6 +82,8 @@ export default function POSPage() {
   const { salesMode, isWholesale } = useSalesMode();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [stockAlertItem, setStockAlertItem] = useState<any | null>(null);
+  const notifiedRef = useRef<Set<string>>(new Set());
   const searchRef = useRef<HTMLInputElement>(null);
   const searchDebounceRef = useRef<number>(0);
   const lastScanRef = useRef<number>(0);
@@ -119,6 +122,19 @@ export default function POSPage() {
   const { data: inventory, isLoading: invLoading } = useListInventory({
     locationId: selectedLocationId ?? undefined,
   });
+
+  // Fire browser notifications for low/out-of-stock items (once per session)
+  useEffect(() => {
+    if (!inventory) return;
+    (inventory as any[]).forEach((item: any) => {
+      if (notifiedRef.current.has(item.id)) return;
+      const isLow = (item.quantity ?? 0) <= (item.minQuantity ?? 0);
+      if (!isLow) return;
+      notifiedRef.current.add(item.id);
+      fireStockNotification(item.name, item.quantity ?? 0, `${window.location.origin}/inventory`);
+    });
+  }, [inventory]);
+
   const { data: locations } = useListLocations();
   const { data: settings } = useGetSettings({ query: { staleTime: 0 } } as any);
   const { data: allUsers } = useListUsers();
@@ -610,22 +626,36 @@ export default function POSPage() {
               {filtered.map(item => {
                 const inCart = cart.find(c => c.itemId === item.id);
                 const outOfStock = item.quantity <= 0;
+                const isLowStock = !outOfStock && (item.quantity ?? 0) <= (item.minQuantity ?? 5);
                 return (
                   <button
                     key={item.id}
-                    onClick={() => !outOfStock && addToCart(item)}
-                    disabled={outOfStock}
+                    onClick={() => outOfStock ? setStockAlertItem(item) : addToCart(item)}
                     className={cn(
                       "relative p-3 lg:p-4 rounded-xl border text-left transition-all hover:shadow-md active:scale-95",
-                      inCart ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/50",
-                      outOfStock && "opacity-50 cursor-not-allowed"
+                      inCart ? "border-primary bg-primary/5"
+                        : outOfStock ? "border-red-200 bg-red-50/30 hover:border-red-300 opacity-70"
+                        : isLowStock ? "border-amber-300 hover:border-amber-400 bg-card"
+                        : "border-border bg-card hover:border-primary/50"
                     )}
                   >
-                    {inCart && (
+                    {inCart ? (
                       <span className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center text-[10px] font-bold text-primary-foreground">
                         {inCart.quantity}
                       </span>
-                    )}
+                    ) : outOfStock ? (
+                      <span className="absolute top-2 right-2 w-6 h-6 bg-red-100 rounded-full flex items-center justify-center">
+                        <AlertTriangle className="w-3 h-3 text-red-500" />
+                      </span>
+                    ) : isLowStock ? (
+                      <span
+                        className="absolute top-2 right-2 w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center hover:bg-amber-200 cursor-pointer z-10"
+                        onClick={e => { e.stopPropagation(); setStockAlertItem(item); }}
+                        title="Alert manager about low stock"
+                      >
+                        <Bell className="w-3 h-3 text-amber-600" />
+                      </span>
+                    ) : null}
                     <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-lg bg-muted flex items-center justify-center mb-2">
                       <Package className="w-6 h-6 text-muted-foreground" />
                     </div>
@@ -641,8 +671,10 @@ export default function POSPage() {
                         formatCurrency(item.price)
                       )}
                     </p>
-                    <p className="text-muted-foreground text-[10px] mt-0.5">
-                      {outOfStock ? "Out of stock" : `${item.quantity} ${item.unit ?? "pcs"} left`}
+                    <p className={cn("text-[10px] mt-0.5 font-medium",
+                      outOfStock ? "text-red-500" : isLowStock ? "text-amber-600" : "text-muted-foreground font-normal"
+                    )}>
+                      {outOfStock ? "Tap to alert manager" : isLowStock ? `⚠ ${item.quantity} ${item.unit ?? "pcs"} left` : `${item.quantity} ${item.unit ?? "pcs"} left`}
                     </p>
                     {item.sku && (
                       <p className="text-muted-foreground text-[9px] mt-0.5 font-mono">{item.sku}</p>
@@ -1177,6 +1209,92 @@ export default function POSPage() {
           onClose={() => { setReceiptOpen(false); setCompletedTx(null); }}
           transactionId={completedTx.id}
         />
+      )}
+
+      {/* ============ STOCK ALERT DIALOG ============ */}
+      {stockAlertItem && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4"
+          onClick={() => setStockAlertItem(null)}
+        >
+          <div
+            className="bg-card rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className={cn(
+              "p-5 flex items-center gap-4",
+              stockAlertItem.quantity <= 0 ? "bg-red-50 border-b border-red-100" : "bg-amber-50 border-b border-amber-100"
+            )}>
+              <div className={cn(
+                "w-12 h-12 rounded-full flex items-center justify-center shrink-0",
+                stockAlertItem.quantity <= 0 ? "bg-red-100" : "bg-amber-100"
+              )}>
+                <AlertTriangle className={cn("w-6 h-6", stockAlertItem.quantity <= 0 ? "text-red-600" : "text-amber-600")} />
+              </div>
+              <div className="min-w-0">
+                <p className={cn("font-bold text-base", stockAlertItem.quantity <= 0 ? "text-red-700" : "text-amber-700")}>
+                  {stockAlertItem.quantity <= 0 ? "Out of Stock" : "Low Stock"}
+                </p>
+                <p className="text-sm text-muted-foreground font-medium truncate">{stockAlertItem.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {stockAlertItem.quantity <= 0
+                    ? "No stock remaining"
+                    : `${stockAlertItem.quantity} ${stockAlertItem.unit ?? "pcs"} left`}
+                </p>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-3">
+              <p className="text-sm text-center text-muted-foreground">
+                {stockAlertItem.quantity <= 0
+                  ? "This item is out of stock. Tap the button below to instantly notify your manager via WhatsApp."
+                  : "Stock is running low. You can still sell this item or notify your manager to reorder."}
+              </p>
+
+              {/* WhatsApp alert button */}
+              <button
+                className="w-full flex items-center justify-center gap-2.5 py-4 px-4 rounded-xl bg-green-500 hover:bg-green-600 active:bg-green-700 text-white font-bold text-sm transition-colors shadow-sm"
+                onClick={() => {
+                  const phone = (settings as any)?.alert_active_contact;
+                  if (!phone) {
+                    toast({
+                      title: "No alert contact configured",
+                      description: "Go to Settings → System → Stock Alert Contacts to add a manager number.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  const item = stockAlertItem;
+                  const status = (item.quantity ?? 0) <= 0
+                    ? "OUT OF STOCK ❌"
+                    : `LOW STOCK ⚠️ (${item.quantity} ${item.unit ?? "pcs"} remaining)`;
+                  const msg = encodeURIComponent(
+                    `🚨 *Stock Alert — Fremon Collection POS*\n\n` +
+                    `*Item:* ${item.name}\n` +
+                    `*Status:* ${status}\n` +
+                    (item.sku ? `*SKU:* ${item.sku}\n` : "") +
+                    `\nImmediate restocking required.\n\n` +
+                    `📦 View Inventory: ${window.location.origin}/inventory`
+                  );
+                  window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
+                  setStockAlertItem(null);
+                }}
+              >
+                <MessageCircle className="w-5 h-5" />
+                Alert Manager via WhatsApp
+              </button>
+
+              <button
+                className="w-full py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted"
+                onClick={() => setStockAlertItem(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

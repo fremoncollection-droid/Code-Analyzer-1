@@ -27,7 +27,32 @@ export default function InventoryPage() {
   });
   const [showKpis, setShowKpis] = useState(true);
   const [tableHeight, setTableHeight] = useState(480);
+  const [itemColWidth, setItemColWidth] = useState(220);
   const dragState = useRef<{ startY: number; startH: number } | null>(null);
+  const colDragState = useRef<{ startX: number; startW: number } | null>(null);
+
+  const onColDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    colDragState.current = { startX, startW: itemColWidth };
+    const onMove = (ev: Event) => {
+      if (!colDragState.current) return;
+      const clientX = ev instanceof TouchEvent ? ev.touches[0]?.clientX ?? colDragState.current.startX : (ev as MouseEvent).clientX;
+      setItemColWidth(Math.max(120, Math.min(480, colDragState.current.startW + clientX - colDragState.current.startX)));
+    };
+    const onUp = () => {
+      colDragState.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onMove, { passive: false } as any);
+    window.addEventListener("touchend", onUp);
+  }, [itemColWidth]);
 
   const onDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
@@ -302,7 +327,20 @@ export default function InventoryPage() {
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-card">
               <tr className="border-b border-border">
-                <th className="text-left px-4 py-3 text-muted-foreground font-medium sticky left-0 z-20 bg-card">Item</th>
+                <th
+                  style={{ width: itemColWidth, minWidth: itemColWidth }}
+                  className="text-left px-4 py-3 text-muted-foreground font-medium sticky left-0 z-20 bg-card relative select-none"
+                >
+                  Item
+                  <div
+                    className="absolute right-0 top-0 h-full w-3 flex items-center justify-center cursor-col-resize touch-none group/col"
+                    onMouseDown={onColDragStart}
+                    onTouchStart={onColDragStart}
+                    title="Drag to resize column"
+                  >
+                    <div className="w-0.5 h-5 rounded-full bg-border group-hover/col:bg-teal-400 transition-colors" />
+                  </div>
+                </th>
                 <th className="text-left px-4 py-3 text-muted-foreground font-medium">Category</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">Cost Price</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">Sell Price</th>
@@ -329,7 +367,10 @@ export default function InventoryPage() {
 
                 return (
                   <tr key={item.id} className="group border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3 sticky left-0 z-10 bg-background group-hover:bg-muted/30 transition-colors">
+                    <td
+                      style={{ width: itemColWidth, minWidth: itemColWidth, maxWidth: itemColWidth }}
+                      className="px-4 py-3 sticky left-0 z-10 bg-background group-hover:bg-muted/30 transition-colors overflow-hidden"
+                    >
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                           <Package className="w-4 h-4 text-muted-foreground" />

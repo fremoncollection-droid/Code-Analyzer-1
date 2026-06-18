@@ -56,6 +56,8 @@ import {
   Mail,
   Globe,
   FileText,
+  Bell,
+  MessageCircle,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -101,6 +103,12 @@ export default function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { refresh } = useBranding();
 
+  // Alert contacts state
+  const [alertContacts, setAlertContacts] = useState<{ name: string; phone: string }[]>([]);
+  const [alertActiveContact, setAlertActiveContact] = useState("");
+  const [newContactName, setNewContactName] = useState("");
+  const [newContactPhone, setNewContactPhone] = useState("");
+
   // Receipt layout state
   const [receiptPhone, setReceiptPhone] = useState("");
   const [receiptEmail, setReceiptEmail] = useState("");
@@ -134,6 +142,8 @@ export default function SettingsPage() {
     setReceiptFooter(settings.receipt_footer ?? "");
     setReceiptReturnPolicy(settings.receipt_return_policy ?? "");
     setReceiptShowLogo(settings.receipt_show_logo !== "false");
+    try { setAlertContacts(settings.alert_contacts ? JSON.parse(settings.alert_contacts) : []); } catch { setAlertContacts([]); }
+    setAlertActiveContact(settings.alert_active_contact ?? "");
   }, [!!settings]); // run once when settings first arrive
 
   const isAdmin = user?.role === "admin";
@@ -864,6 +874,74 @@ export default function SettingsPage() {
               >
                 <Save className="w-3 h-3" /> Save Receipt Layout
               </Button>
+            </div>
+
+            {/* ── Stock Alert Contacts ── */}
+            <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+              <div>
+                <p className="text-sm font-medium flex items-center gap-2"><Bell className="w-4 h-4" /> Stock Alert Contacts</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Manager phone numbers for WhatsApp stock alerts. Mark one as Active — the POS "Alert Manager" button will use it.</p>
+              </div>
+              <div className="space-y-2">
+                {alertContacts.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-3 border border-dashed border-border rounded-lg">No contacts added yet</p>
+                )}
+                {alertContacts.map((c, i) => (
+                  <div key={i} className="flex items-center gap-2 p-2.5 rounded-lg border bg-background">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{c.name}</p>
+                      <p className="text-xs text-muted-foreground font-mono">+{c.phone}</p>
+                    </div>
+                    {alertActiveContact === c.phone ? (
+                      <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">ACTIVE</span>
+                    ) : (
+                      <Button size="sm" variant="ghost" className="h-7 text-xs shrink-0 text-teal-600 hover:text-teal-700"
+                        onClick={() => {
+                          setAlertActiveContact(c.phone);
+                          updateSettings.mutate({ data: { alert_active_contact: c.phone } });
+                        }}>Set Active</Button>
+                    )}
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive hover:text-destructive shrink-0"
+                      onClick={() => {
+                        const updated = alertContacts.filter((_, idx) => idx !== i);
+                        const newActive = alertActiveContact === c.phone ? (updated[0]?.phone ?? "") : alertActiveContact;
+                        setAlertContacts(updated);
+                        setAlertActiveContact(newActive);
+                        updateSettings.mutate({ data: { alert_contacts: JSON.stringify(updated), alert_active_contact: newActive } });
+                      }}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-2 pt-1 border-t border-border">
+                <p className="text-xs font-medium text-muted-foreground">Add New Contact</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input placeholder="Manager name" value={newContactName} onChange={e => setNewContactName(e.target.value)} className="h-8 text-sm" />
+                  <Input placeholder="Phone e.g. 233244123456" value={newContactPhone} onChange={e => setNewContactPhone(e.target.value)} className="h-8 text-sm" type="tel" />
+                  <Button size="sm" variant="outline" className="h-8 shrink-0"
+                    disabled={!newContactName.trim() || !newContactPhone.trim() || updateSettings.isPending}
+                    onClick={() => {
+                      const contact = { name: newContactName.trim(), phone: newContactPhone.trim().replace(/[^\d]/g, "") };
+                      if (!contact.phone) { toast({ title: "Enter a valid phone number", variant: "destructive" }); return; }
+                      const updated = [...alertContacts, contact];
+                      const newActive = alertContacts.length === 0 ? contact.phone : alertActiveContact;
+                      setAlertContacts(updated);
+                      setAlertActiveContact(newActive);
+                      setNewContactName(""); setNewContactPhone("");
+                      updateSettings.mutate({ data: { alert_contacts: JSON.stringify(updated), alert_active_contact: newActive } });
+                      toast({ title: "Contact saved", description: alertContacts.length === 0 ? "Set as active contact automatically" : undefined });
+                    }}>
+                    <Plus className="w-3 h-3 mr-1" /> Add
+                  </Button>
+                </div>
+              </div>
+              {alertActiveContact && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-green-50 border border-green-200 text-xs text-green-700">
+                  <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>WhatsApp alerts go to: <strong>{alertContacts.find(c => c.phone === alertActiveContact)?.name ?? alertActiveContact}</strong></span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

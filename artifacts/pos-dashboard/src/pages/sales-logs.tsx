@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useListSalesLogs } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useSalesMode } from "@/lib/sales-mode";
@@ -145,7 +145,8 @@ export default function SalesLogsPage() {
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [calMonth, setCalMonth] = useState(todayStr().slice(0, 7));
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [modeFilter, setModeFilter] = useState<"all" | "retail" | "wholesale">("all");
+  const [modeFilter, setModeFilter] = useState<"all" | "retail" | "wholesale">(salesMode);
+  useEffect(() => { setModeFilter(salesMode); }, [salesMode]);
   const [actionFilter, setActionFilter] = useState("all");
   const [sortField, setSortField] = useState<SortField>("time");
   const [sortDir, setSortDir] = useState<SortDir>("desc");

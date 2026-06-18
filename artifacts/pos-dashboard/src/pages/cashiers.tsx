@@ -32,26 +32,26 @@ export default function CashiersPage() {
     role: "cashier", locationId: "", station: "", isActive: true,
   });
 
-  const { data: users, isLoading } = useListUsers({ role: "cashier" });
+  const { data: users, isLoading } = useListUsers();
   const { data: locations } = useListLocations();
 
   const createUser = useCreateUser({
     mutation: {
-      onSuccess: () => { invalidate(); closeDialog(); toast({ title: "Cashier created" }); },
+      onSuccess: () => { invalidate(); closeDialog(); toast({ title: "User created" }); },
       onError: () => toast({ title: "Create failed", variant: "destructive" }),
     },
   });
 
   const updateUser = useUpdateUser({
     mutation: {
-      onSuccess: () => { invalidate(); closeDialog(); toast({ title: "Cashier updated" }); },
+      onSuccess: () => { invalidate(); closeDialog(); toast({ title: "User updated" }); },
       onError: () => toast({ title: "Update failed", variant: "destructive" }),
     },
   });
 
   const deleteUser = useDeleteUser({
     mutation: {
-      onSuccess: () => { invalidate(); toast({ title: "Cashier deleted" }); },
+      onSuccess: () => { invalidate(); toast({ title: "User deleted" }); },
       onError: () => toast({ title: "Delete failed", variant: "destructive" }),
     },
   });
@@ -109,11 +109,11 @@ export default function CashiersPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Cashier Management</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">Create and manage cashier accounts</p>
+          <h1 className="text-2xl font-bold">Cashiers / Admins</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">Create and manage staff accounts</p>
         </div>
         <Button onClick={openCreate} className="gap-2">
-          <Plus className="w-4 h-4" /> Add Cashier
+          <Plus className="w-4 h-4" /> Add User
         </Button>
       </div>
 
@@ -179,7 +179,7 @@ export default function CashiersPage() {
                 </tr>
               ))}
               {!isLoading && (!users || users.length === 0) && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No cashiers found</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No users found</td></tr>
               )}
             </tbody>
           </table>
@@ -188,7 +188,7 @@ export default function CashiersPage() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editUser ? "Edit Cashier" : "Add Cashier"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editUser ? "Edit User" : "Add User"}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1">
               <Label>Username *</Label>

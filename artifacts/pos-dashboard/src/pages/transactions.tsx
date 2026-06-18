@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSalesMode } from "@/lib/sales-mode";
 import { useListTransactions, useVoidTransaction } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
@@ -151,7 +152,9 @@ export default function TransactionsPage() {
   const [calMonth, setCalMonth] = useState(todayStr().slice(0, 7));
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [paymentFilter, setPaymentFilter] = useState("all");
-  const [modeFilter, setModeFilter] = useState<"all" | "retail" | "wholesale">("all");
+  const { salesMode } = useSalesMode();
+  const [modeFilter, setModeFilter] = useState<"all" | "retail" | "wholesale">(salesMode);
+  useEffect(() => { setModeFilter(salesMode); }, [salesMode]);
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 

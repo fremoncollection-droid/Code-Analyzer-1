@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, ShoppingCart, Package, CreditCard, BarChart2,
   ArrowLeftRight, Calendar, Settings, LogOut, Menu, X, Store, ChevronDown,
-  Users, ShieldCheck, ClipboardList, Building2, ShoppingBag, Monitor, Shield
+  Users, ShieldCheck, ClipboardList, Building2, ShoppingBag, Monitor, Shield,
+  GripVertical, ChevronUp, ChevronDown as ChevronDownIcon, Pencil, Check,
 } from "lucide-react";
 import { useListLocations, useListPermissions } from "@workspace/api-client-react";
 import {
@@ -27,7 +28,7 @@ const NAV_ITEMS = [
   { path: "/analytics",   icon: BarChart2,       label: "Analytics",      roles: ["admin", "manager"], moduleKey: "analytics" },
   { path: "/transfers",   icon: ArrowLeftRight,  label: "Transfers",      roles: ["admin", "manager"], moduleKey: "transfers" },
   { path: "/shifts",      icon: Calendar,        label: "Shifts",         roles: ["admin", "manager"], moduleKey: "shifts" },
-  { path: "/cashiers",    icon: Users,           label: "Cashiers",       roles: ["admin", "manager"] },
+  { path: "/cashiers",    icon: Users,           label: "Cashiers / Admins", roles: ["admin", "manager"] },
   { path: "/audit",       icon: ShieldCheck,     label: "Audit",          roles: ["admin", "manager"], moduleKey: "audit" },
   { path: "/sales-logs",  icon: ClipboardList,   label: "Sales Logs",     roles: ["admin", "manager"], moduleKey: "sales-logs" },
   { path: "/permissions", icon: Shield,          label: "Permissions",    roles: ["admin"] },
@@ -67,6 +68,22 @@ function ModeToggle() {
   );
 }
 
+const DEFAULT_NAV_ORDER = NAV_ITEMS.map(i => i.path);
+
+function loadNavOrder(): string[] {
+  try {
+    const saved = localStorage.getItem("pos_nav_order");
+    if (saved) {
+      const parsed: string[] = JSON.parse(saved);
+      // merge: keep saved order, append any new paths not yet in saved
+      const valid = parsed.filter(p => DEFAULT_NAV_ORDER.includes(p));
+      const added = DEFAULT_NAV_ORDER.filter(p => !valid.includes(p));
+      return [...valid, ...added];
+    }
+  } catch {}
+  return DEFAULT_NAV_ORDER;
+}
+
 export default function Layout({ children }: { children: ReactNode }) {
   const { user, logout, selectedLocationId, setSelectedLocationId } = useAuth();
   const { branding } = useBranding();
@@ -74,6 +91,20 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { data: locations } = useListLocations();
+  const [reorderMode, setReorderMode] = useState(false);
+  const [navOrder, setNavOrder] = useState<string[]>(loadNavOrder);
+
+  function moveItem(path: string, dir: -1 | 1) {
+    setNavOrder(prev => {
+      const arr = [...prev];
+      const idx = arr.indexOf(path);
+      const to = idx + dir;
+      if (to < 0 || to >= arr.length) return arr;
+      [arr[idx], arr[to]] = [arr[to], arr[idx]];
+      localStorage.setItem("pos_nav_order", JSON.stringify(arr));
+      return arr;
+    });
+  }
 
   const isCashier = user?.role === "cashier";
 
@@ -170,29 +201,64 @@ export default function Layout({ children }: { children: ReactNode }) {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map(item => {
-            if (!isNavVisible(item)) return null;
-            const { path, icon: Icon, label } = item;
-            const active = location === path || (path !== "/" && location.startsWith(path));
-            return (
-              <Link key={path} href={path}>
-                <div
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium cursor-pointer transition-colors",
-                    active
-                      ? isWholesale
-                        ? "bg-blue-600 text-white"
-                        : "bg-sidebar-primary text-sidebar-primary-foreground"
-                      : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+          {navOrder
+            .map(p => NAV_ITEMS.find(i => i.path === p))
+            .filter((item): item is (typeof NAV_ITEMS)[number] => !!item && isNavVisible(item))
+            .map((item, idx, visible) => {
+              const { path, icon: Icon, label } = item;
+              const active = location === path || (path !== "/" && location.startsWith(path));
+              return (
+                <div key={path} className="flex items-center gap-1">
+                  {reorderMode && (
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        onClick={() => moveItem(path, -1)}
+                        disabled={idx === 0}
+                        className="text-sidebar-foreground/40 hover:text-sidebar-foreground disabled:opacity-20 p-0.5"
+                      >
+                        <ChevronUp className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => moveItem(path, 1)}
+                        disabled={idx === visible.length - 1}
+                        className="text-sidebar-foreground/40 hover:text-sidebar-foreground disabled:opacity-20 p-0.5"
+                      >
+                        <ChevronDownIcon className="w-3 h-3" />
+                      </button>
+                    </div>
                   )}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <Icon className="w-4 h-4" />
-                  {label}
+                  {reorderMode ? (
+                    <div
+                      className={cn(
+                        "flex flex-1 items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-grab",
+                        "text-sidebar-foreground/70 bg-sidebar-accent/50"
+                      )}
+                    >
+                      <GripVertical className="w-3.5 h-3.5 text-sidebar-foreground/30" />
+                      <Icon className="w-4 h-4" />
+                      {label}
+                    </div>
+                  ) : (
+                    <Link key={path} href={path} className="flex-1">
+                      <div
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium cursor-pointer transition-colors",
+                          active
+                            ? isWholesale
+                              ? "bg-blue-600 text-white"
+                              : "bg-sidebar-primary text-sidebar-primary-foreground"
+                            : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+                        )}
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {label}
+                      </div>
+                    </Link>
+                  )}
                 </div>
-              </Link>
-            );
-          })}
+              );
+            })}
         </nav>
 
         {/* User footer */}
@@ -206,15 +272,33 @@ export default function Layout({ children }: { children: ReactNode }) {
               <p className="text-xs text-sidebar-foreground/50 capitalize">{user?.role}</p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-start gap-2 border-sidebar-border text-sidebar-foreground/70 hover:text-sidebar-foreground bg-transparent hover:bg-sidebar-accent"
-            onClick={logout}
-          >
-            <LogOut className="w-3 h-3" />
-            Sign out
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 justify-start gap-2 border-sidebar-border text-sidebar-foreground/70 hover:text-sidebar-foreground bg-transparent hover:bg-sidebar-accent"
+              onClick={logout}
+            >
+              <LogOut className="w-3 h-3" />
+              Sign out
+            </Button>
+            {!isCashier && (
+              <Button
+                variant="outline"
+                size="sm"
+                title={reorderMode ? "Done reordering" : "Reorder sidebar"}
+                className={cn(
+                  "border-sidebar-border bg-transparent hover:bg-sidebar-accent",
+                  reorderMode
+                    ? "text-emerald-400 border-emerald-500/50"
+                    : "text-sidebar-foreground/50 hover:text-sidebar-foreground"
+                )}
+                onClick={() => setReorderMode(r => !r)}
+              >
+                {reorderMode ? <Check className="w-3 h-3" /> : <Pencil className="w-3 h-3" />}
+              </Button>
+            )}
+          </div>
         </div>
       </aside>
 

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useSearch } from "wouter";
 import { useListInventory, useListCategories, useListLocations, useListUnits, useListShelves, useCreateInventoryItem, useUpdateInventoryItem, useDeleteInventoryItem } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
@@ -26,6 +26,26 @@ export default function InventoryPage() {
     return params.get("filter") || null;
   });
   const [showKpis, setShowKpis] = useState(true);
+  const [tableHeight, setTableHeight] = useState(480);
+  const dragState = useRef<{ startY: number; startH: number } | null>(null);
+
+  const onDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragState.current = { startY: e.clientY, startH: tableHeight };
+    const onMove = (ev: MouseEvent) => {
+      if (!dragState.current) return;
+      const delta = ev.clientY - dragState.current.startY;
+      setTableHeight(Math.max(180, Math.min(1200, dragState.current.startH + delta)));
+    };
+    const onUp = () => {
+      dragState.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [tableHeight]);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState<any | null>(null);
   const [form, setForm] = useState({
@@ -110,10 +130,10 @@ export default function InventoryPage() {
   const itemsWithCost = items.filter(i => i.cost && parseFloat(i.cost) > 0).length;
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="flex flex-col px-6 pt-6 pb-8 gap-4">
 
-      {/* ── Fixed top section (never scrolls) ── */}
-      <div className="shrink-0 px-6 pt-6 space-y-4">
+      {/* ── Top section (scrolls with page) ── */}
+      <div className="flex flex-col gap-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -246,8 +266,18 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* ── Scrollable table (fills remaining height) ── */}
-      <div className="flex-1 min-h-0 px-6 pb-6 pt-4 flex flex-col">
+      {/* ── Drag handle ── */}
+      <div
+        className="group flex flex-col items-center gap-1 py-1 cursor-row-resize select-none"
+        onMouseDown={onDragStart}
+        title="Drag to resize table"
+      >
+        <div className="w-12 h-1 rounded-full bg-border group-hover:bg-teal-400 transition-colors duration-150" />
+        <div className="w-8 h-1 rounded-full bg-border/60 group-hover:bg-teal-300 transition-colors duration-150" />
+      </div>
+
+      {/* ── Table (height draggable) ── */}
+      <div style={{ height: tableHeight }} className="flex flex-col">
         <Card className="border-card-border flex-1 min-h-0 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-auto">
           <table className="w-full text-sm">
@@ -364,7 +394,7 @@ export default function InventoryPage() {
             </div>
           )}
         </Card>
-      </div>{/* end flex-1 table wrapper */}
+      </div>{/* end table height wrapper */}
 
       {/* Add/Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

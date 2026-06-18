@@ -593,41 +593,6 @@ export interface SalesLog {
   createdAt: string;
 }
 
-export interface Lead {
-  id: string;
-  name: string;
-  /** @nullable */
-  phone?: string | null;
-  /** @nullable */
-  email?: string | null;
-  status: string;
-  /** @nullable */
-  source?: string | null;
-  /** @nullable */
-  notes?: string | null;
-  /** @nullable */
-  estimatedValue?: string | null;
-  /** @nullable */
-  assignedTo?: string | null;
-  /** @nullable */
-  locationId?: string | null;
-  /** @nullable */
-  lastContactedAt?: string | null;
-  createdAt: string;
-}
-
-export interface LeadInput {
-  name?: string;
-  phone?: string;
-  email?: string;
-  status?: string;
-  source?: string;
-  notes?: string;
-  estimatedValue?: string;
-  assignedTo?: string;
-  locationId?: string;
-}
-
 export interface Task {
   id: string;
   userId: string;
@@ -850,17 +815,6 @@ export const ListSalesLogsSalesMode = {
   retail: 'retail',
   wholesale: 'wholesale',
 } as const;
-
-export type ListLeadsParams = {
-status?: string;
-search?: string;
-locationId?: string;
-};
-
-export type GetPipelineSummary200Item = {
-  status?: string;
-  count?: number;
-};
 
 export type ListTasksParams = {
 date?: string;

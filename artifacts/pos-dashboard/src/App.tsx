@@ -19,8 +19,6 @@ import CashiersPage from "@/pages/cashiers";
 import AuditPage from "@/pages/audit";
 import SalesLogsPage from "@/pages/sales-logs";
 import DisplayPage from "@/pages/display";
-import LeadsPage from "@/pages/leads";
-import SalesManagerPage from "@/pages/sales-manager";
 import PermissionsPage from "@/pages/permissions";
 import NotFound from "@/pages/not-found";
 import { useListPermissions } from "@workspace/api-client-react";
@@ -36,7 +34,6 @@ const MODULE_ROUTES: Record<string, { path: string; component: React.ComponentTy
   inventory:    { path: "/inventory",    component: InventoryPage },
   transactions: { path: "/transactions", component: TransactionsPage },
   analytics:    { path: "/analytics",   component: AnalyticsPage },
-  leads:        { path: "/leads",        component: LeadsPage },
   transfers:    { path: "/transfers",   component: TransfersPage },
   shifts:       { path: "/shifts",      component: ShiftsPage },
   "sales-logs": { path: "/sales-logs",  component: SalesLogsPage },
@@ -88,8 +85,6 @@ function StaffApp() {
         <Route path="/sales-logs" component={SalesLogsPage} />
         <Route path="/settings" component={SettingsPage} />
         <Route path="/display" component={DisplayPage} />
-        <Route path="/leads" component={LeadsPage} />
-        <Route path="/sales-manager" component={SalesManagerPage} />
         <Route path="/permissions" component={PermissionsPage} />
         <Route component={NotFound} />
       </Switch>

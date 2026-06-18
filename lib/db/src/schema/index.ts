@@ -10,7 +10,6 @@ export * from "./transfers";
 export * from "./audit";
 export * from "./settings";
 export * from "./sales_logs";
-export * from "./leads";
 export * from "./tasks";
 export * from "./discount_requests";
 export * from "./user_permissions";

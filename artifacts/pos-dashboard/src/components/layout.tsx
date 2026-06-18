@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, ShoppingCart, Package, CreditCard, BarChart2,
   ArrowLeftRight, Calendar, Settings, LogOut, Menu, X, Store, ChevronDown,
-  Users, ShieldCheck, ClipboardList, Building2, ShoppingBag, Monitor,
-  Target, BarChart3, Shield
+  Users, ShieldCheck, ClipboardList, Building2, ShoppingBag, Monitor, Shield
 } from "lucide-react";
 import { useListLocations, useListPermissions } from "@workspace/api-client-react";
 import {
@@ -26,8 +25,6 @@ const NAV_ITEMS = [
   { path: "/inventory",   icon: Package,         label: "Inventory",      roles: ["admin", "manager"], moduleKey: "inventory" },
   { path: "/transactions",icon: CreditCard,      label: "Transactions",   roles: ["admin", "manager"], moduleKey: "transactions" },
   { path: "/analytics",   icon: BarChart2,       label: "Analytics",      roles: ["admin", "manager"], moduleKey: "analytics" },
-  { path: "/leads",       icon: Target,          label: "My Leads",       roles: ["admin", "manager"], moduleKey: "leads" },
-  { path: "/sales-manager",icon: BarChart3,      label: "Sales Manager",  roles: ["manager", "admin"] },
   { path: "/transfers",   icon: ArrowLeftRight,  label: "Transfers",      roles: ["admin", "manager"], moduleKey: "transfers" },
   { path: "/shifts",      icon: Calendar,        label: "Shifts",         roles: ["admin", "manager"], moduleKey: "shifts" },
   { path: "/cashiers",    icon: Users,           label: "Cashiers",       roles: ["admin", "manager"] },

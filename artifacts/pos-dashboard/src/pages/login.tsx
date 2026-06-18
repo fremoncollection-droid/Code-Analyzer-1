@@ -212,10 +212,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="text-center text-slate-600 text-xs mt-6 tracking-wide">
-          admin / admin123 &nbsp;&middot;&nbsp; cashier1 / cash123 (PIN: 1234)
-        </p>
-
       </div>
 
       {/* Powered by MirrorTech — fixed bottom-left */}

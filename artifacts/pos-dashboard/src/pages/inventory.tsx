@@ -329,23 +329,20 @@ export default function InventoryPage() {
                 <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">No items found</td></tr>
               )}
             </tbody>
-            {/* Footer totals row */}
-            {!isLoading && items.length > 0 && (
-              <tfoot>
-                <tr className="border-t-2 border-border bg-muted/30 font-semibold">
-                  <td colSpan={2} className="px-4 py-3 text-sm text-muted-foreground">Totals ({items.length} items)</td>
-                  <td className="px-4 py-3 text-right text-sm text-orange-600">{totalCostValue > 0 ? formatCurrency(totalCostValue / items.filter(i => parseFloat(i.cost ?? "0") > 0).length || 1) : "—"}</td>
-                  <td className="px-4 py-3 text-right text-sm">{formatCurrency(totalSellingValue / items.length)}</td>
-                  <td className="px-4 py-3 hidden lg:table-cell" />
-                  <td className="px-4 py-3 text-right text-sm text-green-600">{formatCurrency(totalProfit / (itemsWithCost || 1))}</td>
-                  <td className="px-4 py-3 text-right text-sm">{items.reduce((s, i) => s + (i.quantity ?? 0), 0)} units</td>
-                  <td className="px-4 py-3 text-right text-sm text-orange-600 font-bold">{formatCurrency(totalCostValue)}</td>
-                  <td className="px-4 py-3" />
-                </tr>
-              </tfoot>
-            )}
           </table>
           </div>{/* end overflow-auto scroll area */}
+
+          {/* Pinned totals bar — outside scroll, always visible */}
+          {!isLoading && items.length > 0 && (
+            <div className="shrink-0 border-t-2 border-border bg-muted/30 px-4 py-2.5 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm font-semibold">
+              <span className="text-muted-foreground mr-auto">Totals · {items.length} items</span>
+              <span className="text-muted-foreground font-normal text-xs">Avg cost: <span className="text-orange-600 font-semibold">{totalCostValue > 0 ? formatCurrency(totalCostValue / (itemsWithCost || 1)) : "—"}</span></span>
+              <span className="text-muted-foreground font-normal text-xs">Avg sell: <span className="font-semibold">{formatCurrency(totalSellingValue / items.length)}</span></span>
+              <span className="text-muted-foreground font-normal text-xs">Avg profit: <span className={`font-semibold ${totalProfit >= 0 ? "text-green-600" : "text-destructive"}`}>{formatCurrency(totalProfit / (itemsWithCost || 1))}</span></span>
+              <span className="text-muted-foreground font-normal text-xs">Stock: <span className="font-semibold">{items.reduce((s, i) => s + (i.quantity ?? 0), 0)} units</span></span>
+              <span className="text-muted-foreground font-normal text-xs">Total cost: <span className="text-orange-600 font-bold">{formatCurrency(totalCostValue)}</span></span>
+            </div>
+          )}
         </Card>
       </div>{/* end flex-1 table wrapper */}
 

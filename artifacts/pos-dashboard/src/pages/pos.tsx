@@ -131,7 +131,7 @@ export default function POSPage() {
       const isLow = (item.quantity ?? 0) <= (item.minQuantity ?? 0);
       if (!isLow) return;
       notifiedRef.current.add(item.id);
-      fireStockNotification(item.name, item.quantity ?? 0, `${window.location.origin}/inventory`);
+      fireStockNotification(item.name, item.quantity ?? 0, `${window.location.origin}/inventory?missing=lowstock`);
     });
   }, [inventory]);
 
@@ -1276,7 +1276,7 @@ export default function POSPage() {
                     `*Status:* ${status}\n` +
                     (item.sku ? `*SKU:* ${item.sku}\n` : "") +
                     `\nImmediate restocking required.\n\n` +
-                    `📦 View Inventory: ${window.location.origin}/inventory`
+                    `📦 View Inventory: ${window.location.origin}/inventory?missing=lowstock`
                   );
                   window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
                   setStockAlertItem(null);

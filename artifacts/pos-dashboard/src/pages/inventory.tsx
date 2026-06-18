@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useSearch } from "wouter";
 import { useListInventory, useListCategories, useListLocations, useListUnits, useListShelves, useCreateInventoryItem, useUpdateInventoryItem, useDeleteInventoryItem } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency } from "@/lib/utils";
@@ -11,15 +12,20 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Edit2, Trash2, AlertTriangle, Package, TrendingUp, DollarSign, ShoppingBag, BarChart2, X, Filter } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, AlertTriangle, Package, TrendingUp, DollarSign, ShoppingBag, BarChart2, X, Filter, ChevronUp, ChevronDown } from "lucide-react";
 
 export default function InventoryPage() {
   const { selectedLocationId } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const urlSearch = useSearch();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("__all__");
-  const [missingFilter, setMissingFilter] = useState<string | null>(null);
+  const [missingFilter, setMissingFilter] = useState<string | null>(() => {
+    const params = new URLSearchParams(urlSearch);
+    return params.get("filter") || null;
+  });
+  const [showKpis, setShowKpis] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState<any | null>(null);
   const [form, setForm] = useState({
@@ -75,6 +81,7 @@ export default function InventoryPage() {
   const lowStockItems = allItems.filter(i => i.quantity <= (i.minQuantity ?? 0));
 
   const MISSING_OPTIONS = [
+    { key: "lowstock",   label: "Low Stock" },
     { key: "category",   label: "No Category" },
     { key: "cost",       label: "No Cost Price" },
     { key: "sell",       label: "No Sell Price" },
@@ -86,6 +93,7 @@ export default function InventoryPage() {
     let list = allItems;
     if (categoryFilter !== "__all__")
       list = list.filter(i => i.categoryId === categoryFilter);
+    if (missingFilter === "lowstock")  list = list.filter(i => (i.quantity ?? 0) <= (i.minQuantity ?? 0));
     if (missingFilter === "category")  list = list.filter(i => !i.categoryId);
     if (missingFilter === "cost")      list = list.filter(i => !i.cost || parseFloat(i.cost) === 0);
     if (missingFilter === "sell")      list = list.filter(i => !i.price || parseFloat(i.price) === 0);
@@ -116,13 +124,25 @@ export default function InventoryPage() {
                 : <>{allItems.length} items</>}
             </p>
           </div>
-          <Button onClick={openCreate} className="gap-2">
-            <Plus className="w-4 h-4" /> Add Item
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-muted-foreground"
+              onClick={() => setShowKpis(v => !v)}
+              title={showKpis ? "Collapse summary" : "Expand summary"}
+            >
+              {showKpis ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {showKpis ? "Collapse" : "Expand"}
+            </Button>
+            <Button onClick={openCreate} className="gap-2">
+              <Plus className="w-4 h-4" /> Add Item
+            </Button>
+          </div>
         </div>
 
         {/* Financial summary cards */}
-        {!isLoading && items.length > 0 && (
+        {!isLoading && items.length > 0 && showKpis && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card className="border-card-border">
               <CardContent className="p-4">

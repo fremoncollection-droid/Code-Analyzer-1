@@ -82,7 +82,7 @@ export default function DashboardPage() {
           icon: AlertTriangle,
           color: "text-amber-600",
           bg: "bg-amber-50",
-          href: "/inventory",
+          href: "/inventory?filter=lowstock",
         },
   ];
 

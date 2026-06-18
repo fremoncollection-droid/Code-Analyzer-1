@@ -102,136 +102,136 @@ export default function InventoryPage() {
   const itemsWithCost = items.filter(i => i.cost && parseFloat(i.cost) > 0).length;
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Inventory</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            {(categoryFilter !== "__all__" || missingFilter)
-              ? <>{items.length} of {allItems.length} items</>
-              : <>{allItems.length} items</>}
-          </p>
+    <div className="h-full flex flex-col overflow-hidden">
+
+      {/* ── Fixed top section (never scrolls) ── */}
+      <div className="shrink-0 px-6 pt-6 space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Inventory</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              {(categoryFilter !== "__all__" || missingFilter)
+                ? <>{items.length} of {allItems.length} items</>
+                : <>{allItems.length} items</>}
+            </p>
+          </div>
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="w-4 h-4" /> Add Item
+          </Button>
         </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="w-4 h-4" /> Add Item
-        </Button>
+
+        {/* Financial summary cards */}
+        {!isLoading && items.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="border-card-border">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <ShoppingBag className="w-4 h-4 text-teal-600" />
+                  <p className="text-xs text-muted-foreground font-medium">Stock Value</p>
+                </div>
+                <p className="text-xl font-bold text-teal-700">{formatCurrency(totalSellingValue)}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">at selling price</p>
+              </CardContent>
+            </Card>
+            <Card className="border-card-border">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <DollarSign className="w-4 h-4 text-orange-500" />
+                  <p className="text-xs text-muted-foreground font-medium">Total Cost</p>
+                </div>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(totalCostValue)}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{itemsWithCost} items with cost set</p>
+              </CardContent>
+            </Card>
+            <Card className="border-card-border">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp className="w-4 h-4 text-green-600" />
+                  <p className="text-xs text-muted-foreground font-medium">Potential Profit</p>
+                </div>
+                <p className={`text-xl font-bold ${totalProfit >= 0 ? "text-green-600" : "text-destructive"}`}>{formatCurrency(totalProfit)}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">if all stock is sold</p>
+              </CardContent>
+            </Card>
+            <Card className="border-card-border">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <BarChart2 className="w-4 h-4 text-blue-600" />
+                  <p className="text-xs text-muted-foreground font-medium">Profit Margin</p>
+                </div>
+                <p className={`text-xl font-bold ${profitMargin >= 20 ? "text-green-600" : profitMargin >= 10 ? "text-amber-600" : "text-muted-foreground"}`}>
+                  {profitMargin.toFixed(1)}%
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">overall average</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Low stock alert */}
+        {lowStockItems.length > 0 && (
+          <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>{lowStockItems.length} item{lowStockItems.length > 1 ? "s are" : " is"} running low on stock</span>
+          </div>
+        )}
+
+        {/* Search + Filters */}
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search inventory..." className="pl-9" />
+            </div>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-44 shrink-0">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Categories</SelectItem>
+                {categories?.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+              <Filter className="w-3.5 h-3.5" /> Missing:
+            </div>
+            {MISSING_OPTIONS.map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => setMissingFilter(missingFilter === opt.key ? null : opt.key)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  missingFilter === opt.key
+                    ? "bg-destructive/10 border-destructive/40 text-destructive"
+                    : "bg-muted/50 border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                }`}
+              >
+                {opt.label}
+                {missingFilter === opt.key && <X className="inline w-3 h-3 ml-1 -mr-0.5" />}
+              </button>
+            ))}
+            {(categoryFilter !== "__all__" || missingFilter) && (
+              <button
+                onClick={() => { setCategoryFilter("__all__"); setMissingFilter(null); }}
+                className="px-2.5 py-1 rounded-full text-xs font-medium border border-border text-muted-foreground hover:text-foreground ml-auto"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Financial summary cards */}
-      {!isLoading && items.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="border-card-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <ShoppingBag className="w-4 h-4 text-teal-600" />
-                <p className="text-xs text-muted-foreground font-medium">Stock Value</p>
-              </div>
-              <p className="text-xl font-bold text-teal-700">{formatCurrency(totalSellingValue)}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">at selling price</p>
-            </CardContent>
-          </Card>
-          <Card className="border-card-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <DollarSign className="w-4 h-4 text-orange-500" />
-                <p className="text-xs text-muted-foreground font-medium">Total Cost</p>
-              </div>
-              <p className="text-xl font-bold text-orange-600">{formatCurrency(totalCostValue)}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{itemsWithCost} items with cost set</p>
-            </CardContent>
-          </Card>
-          <Card className="border-card-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <TrendingUp className="w-4 h-4 text-green-600" />
-                <p className="text-xs text-muted-foreground font-medium">Potential Profit</p>
-              </div>
-              <p className={`text-xl font-bold ${totalProfit >= 0 ? "text-green-600" : "text-destructive"}`}>{formatCurrency(totalProfit)}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">if all stock is sold</p>
-            </CardContent>
-          </Card>
-          <Card className="border-card-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <BarChart2 className="w-4 h-4 text-blue-600" />
-                <p className="text-xs text-muted-foreground font-medium">Profit Margin</p>
-              </div>
-              <p className={`text-xl font-bold ${profitMargin >= 20 ? "text-green-600" : profitMargin >= 10 ? "text-amber-600" : "text-muted-foreground"}`}>
-                {profitMargin.toFixed(1)}%
-              </p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">overall average</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Low stock alert */}
-      {lowStockItems.length > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          <span>{lowStockItems.length} item{lowStockItems.length > 1 ? "s are" : " is"} running low on stock</span>
-        </div>
-      )}
-
-      {/* Search + Filters */}
-      <div className="space-y-3">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search inventory..." className="pl-9" />
-          </div>
-          {/* Category filter */}
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-44 shrink-0">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All Categories</SelectItem>
-              {categories?.map(c => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Missing data filter chips */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
-            <Filter className="w-3.5 h-3.5" /> Missing:
-          </div>
-          {MISSING_OPTIONS.map(opt => (
-            <button
-              key={opt.key}
-              onClick={() => setMissingFilter(missingFilter === opt.key ? null : opt.key)}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                missingFilter === opt.key
-                  ? "bg-destructive/10 border-destructive/40 text-destructive"
-                  : "bg-muted/50 border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
-              }`}
-            >
-              {opt.label}
-              {missingFilter === opt.key && (
-                <X className="inline w-3 h-3 ml-1 -mr-0.5" />
-              )}
-            </button>
-          ))}
-          {(categoryFilter !== "__all__" || missingFilter) && (
-            <button
-              onClick={() => { setCategoryFilter("__all__"); setMissingFilter(null); }}
-              className="px-2.5 py-1 rounded-full text-xs font-medium border border-border text-muted-foreground hover:text-foreground ml-auto"
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Table */}
-      <Card className="border-card-border">
-        <div className="overflow-x-auto">
+      {/* ── Scrollable table (fills remaining height) ── */}
+      <div className="flex-1 min-h-0 px-6 pb-6 pt-4 flex flex-col">
+        <Card className="border-card-border flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-auto">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-card">
               <tr className="border-b border-border">
                 <th className="text-left px-4 py-3 text-muted-foreground font-medium">Item</th>
                 <th className="text-left px-4 py-3 text-muted-foreground font-medium">Category</th>
@@ -345,8 +345,9 @@ export default function InventoryPage() {
               </tfoot>
             )}
           </table>
-        </div>
-      </Card>
+          </div>{/* end overflow-auto scroll area */}
+        </Card>
+      </div>{/* end flex-1 table wrapper */}
 
       {/* Add/Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

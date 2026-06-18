@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, auditLogTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { authenticateToken, authorize } from "../middleware/auth";
 
@@ -62,6 +62,18 @@ router.post("/", authenticateToken, authorize("admin", "manager"), async (req, r
     station: body.station ?? null,
   }).returning();
 
+  const actorId = (req as any).user?.id;
+  const ip = req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || undefined;
+  db.insert(auditLogTable).values({
+    userId: actorId ?? null,
+    action: "create_user",
+    tableName: "users",
+    recordId: user.id,
+    newValues: { username: user.username, role: user.role },
+    ipAddress: ip ?? null,
+    userAgent: req.headers["user-agent"] ?? null,
+  }).catch(() => {});
+
   res.status(201).json(user);
 });
 
@@ -91,12 +103,40 @@ router.patch("/:id", authenticateToken, authorize("admin", "manager"), async (re
     res.status(404).json({ error: "User not found" });
     return;
   }
+
+  const actorId2 = (req as any).user?.id;
+  const ip2 = req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || undefined;
+  const safeUpdates = { ...updates };
+  delete safeUpdates.passwordHash;
+  delete safeUpdates.pinHash;
+  db.insert(auditLogTable).values({
+    userId: actorId2 ?? null,
+    action: "update_user",
+    tableName: "users",
+    recordId: user.id,
+    newValues: safeUpdates,
+    ipAddress: ip2 ?? null,
+    userAgent: req.headers["user-agent"] ?? null,
+  }).catch(() => {});
+
   res.json(user);
 });
 
 router.delete("/:id", authenticateToken, authorize("admin"), async (req, res) => {
   const id = String(req.params.id);
   await db.delete(usersTable).where(eq(usersTable.id, id));
+
+  const actorId3 = (req as any).user?.id;
+  const ip3 = req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || undefined;
+  db.insert(auditLogTable).values({
+    userId: actorId3 ?? null,
+    action: "delete_user",
+    tableName: "users",
+    recordId: id,
+    ipAddress: ip3 ?? null,
+    userAgent: req.headers["user-agent"] ?? null,
+  }).catch(() => {});
+
   res.status(204).send();
 });
 

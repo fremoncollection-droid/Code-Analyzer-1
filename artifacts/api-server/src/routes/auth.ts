@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, auditLogTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
@@ -80,6 +80,17 @@ router.post("/login", async (req, res) => {
   const { token, refreshToken } = generateTokens(user);
   req.log.info({ userId: user.id, role: user.role }, "User logged in");
 
+  const ip = req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || undefined;
+  db.insert(auditLogTable).values({
+    userId: user.id,
+    action: "login",
+    tableName: "users",
+    recordId: user.id,
+    newValues: { method: "password", role: user.role },
+    ipAddress: ip ?? null,
+    userAgent: req.headers["user-agent"] ?? null,
+  }).catch(() => {});
+
   res.json({
     token,
     refreshToken,
@@ -157,6 +168,16 @@ router.post("/pin-login", async (req, res) => {
   const { token, refreshToken } = generateTokens(user);
   req.log.info({ userId: user.id, role: user.role, method: "pin" }, "User logged in with PIN");
 
+  db.insert(auditLogTable).values({
+    userId: user.id,
+    action: "login",
+    tableName: "users",
+    recordId: user.id,
+    newValues: { method: "pin", role: user.role },
+    ipAddress: ip ?? null,
+    userAgent: req.headers["user-agent"] ?? null,
+  }).catch(() => {});
+
   res.json({
     token,
     refreshToken,
@@ -206,6 +227,17 @@ router.post("/manager-override", async (req, res) => {
   );
 
   req.log.info({ managerId: user.id, cashierId: (req as any).user?.id }, "Manager override granted");
+
+  const overrideIp = req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || undefined;
+  db.insert(auditLogTable).values({
+    userId: user.id,
+    action: "override",
+    tableName: "users",
+    recordId: user.id,
+    newValues: { managerName: user.username },
+    ipAddress: overrideIp ?? null,
+    userAgent: req.headers["user-agent"] ?? null,
+  }).catch(() => {});
 
   res.json({ overrideToken, managerId: user.id, managerName: user.username, expiresIn: "5m" });
 });

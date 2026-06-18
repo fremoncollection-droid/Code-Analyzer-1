@@ -83,6 +83,18 @@ router.post("/open", authenticateToken, async (req, res) => {
   }).returning();
 
   req.log.info({ shiftId: shift.id, userId: body.userId }, "Shift opened");
+
+  const ipShiftOpen = req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || undefined;
+  db.insert(auditLogTable).values({
+    userId: body.userId,
+    action: "shift_open",
+    tableName: "shifts",
+    recordId: shift.id,
+    newValues: { locationId: body.locationId, openingFloat: body.openingFloat ?? "0" },
+    ipAddress: ipShiftOpen ?? null,
+    userAgent: req.headers["user-agent"] ?? null,
+  }).catch(() => {});
+
   res.status(201).json(shift);
 });
 

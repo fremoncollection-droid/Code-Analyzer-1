@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, inventoryTable, categoriesTable, unitsTable, shelvesTable } from "@workspace/db";
+import { db, inventoryTable, categoriesTable, unitsTable, shelvesTable, auditLogTable } from "@workspace/db";
 import { eq, and, ilike, lte, sql } from "drizzle-orm";
 import { authenticateToken } from "../middleware/auth";
 
@@ -119,6 +119,19 @@ router.post("/", authenticateToken, async (req, res) => {
     shelfId: body.shelfId,
     unit: body.unit ?? "piece",
   }).returning();
+
+  const actorId = (req as any).user?.id;
+  const ip = req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || undefined;
+  db.insert(auditLogTable).values({
+    userId: actorId ?? null,
+    action: "create",
+    tableName: "inventory",
+    recordId: item.id,
+    newValues: { name: item.name, sku: item.sku, quantity: item.quantity },
+    ipAddress: ip ?? null,
+    userAgent: req.headers["user-agent"] ?? null,
+  }).catch(() => {});
+
   res.status(201).json(item);
 });
 
@@ -139,12 +152,37 @@ router.patch("/:id", authenticateToken, async (req, res) => {
     res.status(404).json({ error: "Item not found" });
     return;
   }
+
+  const actorId2 = (req as any).user?.id;
+  const ip2 = req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || undefined;
+  db.insert(auditLogTable).values({
+    userId: actorId2 ?? null,
+    action: "update",
+    tableName: "inventory",
+    recordId: item.id,
+    newValues: updates,
+    ipAddress: ip2 ?? null,
+    userAgent: req.headers["user-agent"] ?? null,
+  }).catch(() => {});
+
   res.json(item);
 });
 
 router.delete("/:id", authenticateToken, async (req, res) => {
   const id = String(req.params.id);
   await db.update(inventoryTable).set({ isActive: false }).where(eq(inventoryTable.id, id));
+
+  const actorId3 = (req as any).user?.id;
+  const ip3 = req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || undefined;
+  db.insert(auditLogTable).values({
+    userId: actorId3 ?? null,
+    action: "delete",
+    tableName: "inventory",
+    recordId: id,
+    ipAddress: ip3 ?? null,
+    userAgent: req.headers["user-agent"] ?? null,
+  }).catch(() => {});
+
   res.status(204).send();
 });
 

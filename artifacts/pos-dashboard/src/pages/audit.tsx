@@ -16,6 +16,12 @@ const ACTION_ICONS: Record<string, any> = {
   shift_close: Clock,
   override: Lock,
   discount: Coins,
+  create: Eye,
+  update: Eye,
+  delete: Trash,
+  create_user: UserCheck,
+  update_user: UserCheck,
+  delete_user: UserX,
   default: Eye,
 };
 
@@ -27,6 +33,12 @@ const ACTION_COLORS: Record<string, string> = {
   shift_close: "bg-blue-50 text-blue-700",
   override: "bg-amber-50 text-amber-700",
   discount: "bg-purple-50 text-purple-700",
+  create: "bg-emerald-50 text-emerald-700",
+  update: "bg-sky-50 text-sky-700",
+  delete: "bg-red-50 text-red-700",
+  create_user: "bg-emerald-50 text-emerald-700",
+  update_user: "bg-sky-50 text-sky-700",
+  delete_user: "bg-red-50 text-red-700",
 };
 
 export default function AuditPage() {
@@ -73,6 +85,12 @@ export default function AuditPage() {
             <SelectItem value="shift_close">Shift Close</SelectItem>
             <SelectItem value="override">Override</SelectItem>
             <SelectItem value="discount">Discount</SelectItem>
+            <SelectItem value="create">Inventory Added</SelectItem>
+            <SelectItem value="update">Inventory Updated</SelectItem>
+            <SelectItem value="delete">Inventory Deleted</SelectItem>
+            <SelectItem value="create_user">User Created</SelectItem>
+            <SelectItem value="update_user">User Updated</SelectItem>
+            <SelectItem value="delete_user">User Deleted</SelectItem>
           </SelectContent>
         </Select>
       </div>

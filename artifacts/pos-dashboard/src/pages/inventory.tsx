@@ -233,7 +233,7 @@ export default function InventoryPage() {
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-card">
               <tr className="border-b border-border">
-                <th className="text-left px-4 py-3 text-muted-foreground font-medium">Item</th>
+                <th className="text-left px-4 py-3 text-muted-foreground font-medium sticky left-0 z-20 bg-card">Item</th>
                 <th className="text-left px-4 py-3 text-muted-foreground font-medium">Category</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">Cost Price</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">Sell Price</th>
@@ -259,8 +259,8 @@ export default function InventoryPage() {
                 const margin = costPrice > 0 && sellPrice > 0 ? ((sellPrice - costPrice) / sellPrice * 100) : null;
 
                 return (
-                  <tr key={item.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3">
+                  <tr key={item.id} className="group border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3 sticky left-0 z-10 bg-background group-hover:bg-muted/30 transition-colors">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                           <Package className="w-4 h-4 text-muted-foreground" />

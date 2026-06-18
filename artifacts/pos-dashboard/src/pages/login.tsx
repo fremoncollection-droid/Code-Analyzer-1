@@ -216,26 +216,30 @@ export default function LoginPage() {
           admin / admin123 &nbsp;&middot;&nbsp; cashier1 / cash123 (PIN: 1234)
         </p>
 
-        {/* Powered by MirrorTech */}
-        <div className="mt-8 flex flex-col items-center gap-2" style={{ animation: "mtechFadeIn 1.2s ease-out 0.6s both" }}>
-          <p className="text-slate-600 text-[10px] tracking-widest uppercase">Powered by</p>
-          <div className="relative group">
-            <div className="absolute -inset-2 rounded-xl bg-gradient-to-r from-orange-500/20 via-slate-400/10 to-orange-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-sm" />
-            <img
-              src="/mtech-logo.jpeg"
-              alt="MirrorTech I.T Solution"
-              className="relative h-10 w-auto object-contain rounded-md opacity-60 hover:opacity-90 transition-opacity duration-500"
-              style={{ filter: "brightness(1.15) contrast(0.9)" }}
-            />
-          </div>
-        </div>
-        <style>{`
-          @keyframes mtechFadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to   { opacity: 1; transform: translateY(0); }
-          }
-        `}</style>
       </div>
+
+      {/* Powered by MirrorTech — fixed bottom-left */}
+      <div
+        className="fixed bottom-5 left-5"
+        style={{ animation: "mtechFadeIn 0.9s ease-out both" }}
+      >
+        <div className="relative group">
+          <div className="absolute -inset-3 rounded-xl bg-gradient-to-r from-orange-500/20 via-slate-400/5 to-orange-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-md pointer-events-none" />
+          <p className="text-slate-500 text-[9px] tracking-widest uppercase leading-none mb-1.5">Powered by</p>
+          <img
+            src="/mtech-logo.jpeg"
+            alt="MirrorTech I.T Solution"
+            className="h-9 w-auto object-contain rounded-md opacity-65 hover:opacity-95 transition-opacity duration-500 cursor-default"
+            style={{ filter: "brightness(1.15) contrast(0.88)" }}
+          />
+        </div>
+      </div>
+      <style>{`
+        @keyframes mtechFadeIn {
+          from { opacity: 0; transform: translateX(-10px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+      `}</style>
     </div>
   );
 }

@@ -21,6 +21,8 @@ export default function InventoryPage() {
   const urlSearch = useSearch();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("__all__");
+  const [unitFilter, setUnitFilter] = useState("__all__");
+  const [shelfFilter, setShelfFilter] = useState("__all__");
   const [missingFilter, setMissingFilter] = useState<string | null>(() => {
     const params = new URLSearchParams(urlSearch);
     return params.get("filter") || null;
@@ -148,6 +150,10 @@ export default function InventoryPage() {
     let list = allItems;
     if (categoryFilter !== "__all__")
       list = list.filter(i => i.categoryId === categoryFilter);
+    if (unitFilter !== "__all__")
+      list = list.filter(i => i.unitId === unitFilter);
+    if (shelfFilter !== "__all__")
+      list = list.filter(i => i.shelfId === shelfFilter);
     if (missingFilter === "lowstock")  list = list.filter(i => (i.quantity ?? 0) <= (i.minQuantity ?? 0));
     if (missingFilter === "category")  list = list.filter(i => !i.categoryId);
     if (missingFilter === "cost")      list = list.filter(i => !i.cost || parseFloat(i.cost) === 0);
@@ -155,7 +161,7 @@ export default function InventoryPage() {
     if (missingFilter === "wholesale") list = list.filter(i => !i.wholesalePrice1);
     if (missingFilter === "stock")     list = list.filter(i => (i.quantity ?? 0) === 0);
     return list;
-  }, [allItems, categoryFilter, missingFilter]);
+  }, [allItems, categoryFilter, unitFilter, shelfFilter, missingFilter]);
 
   // Compute totals
   const totalSellingValue = items.reduce((sum, i) => sum + parseFloat(i.price ?? "0") * (i.quantity ?? 0), 0);
@@ -174,7 +180,7 @@ export default function InventoryPage() {
           <div>
             <h1 className="text-2xl font-bold">Inventory</h1>
             <p className="text-muted-foreground text-sm mt-0.5">
-              {(categoryFilter !== "__all__" || missingFilter)
+              {(categoryFilter !== "__all__" || unitFilter !== "__all__" || shelfFilter !== "__all__" || missingFilter)
                 ? <>{items.length} of {allItems.length} items</>
                 : <>{allItems.length} items</>}
             </p>
@@ -254,19 +260,41 @@ export default function InventoryPage() {
 
         {/* Search + Filters */}
         <div className="space-y-3">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1">
+          <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-48">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search inventory..." className="pl-9 h-10" />
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="sm:w-44 h-10">
+              <SelectTrigger className="sm:w-40 h-10">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">All Categories</SelectItem>
                 {categories?.map(c => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={unitFilter} onValueChange={setUnitFilter}>
+              <SelectTrigger className="sm:w-36 h-10">
+                <SelectValue placeholder="All Units" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Units</SelectItem>
+                {units?.map(u => (
+                  <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={shelfFilter} onValueChange={setShelfFilter}>
+              <SelectTrigger className="sm:w-36 h-10">
+                <SelectValue placeholder="All Shelves" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Shelves</SelectItem>
+                {shelves?.map(s => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -292,9 +320,9 @@ export default function InventoryPage() {
                   {missingFilter === opt.key && <X className="inline w-3 h-3 ml-1 -mr-0.5" />}
                 </button>
               ))}
-              {(categoryFilter !== "__all__" || missingFilter) && (
+              {(categoryFilter !== "__all__" || unitFilter !== "__all__" || shelfFilter !== "__all__" || missingFilter) && (
                 <button
-                  onClick={() => { setCategoryFilter("__all__"); setMissingFilter(null); }}
+                  onClick={() => { setCategoryFilter("__all__"); setUnitFilter("__all__"); setShelfFilter("__all__"); setMissingFilter(null); }}
                   className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border border-border text-muted-foreground hover:text-foreground"
                 >
                   Clear all

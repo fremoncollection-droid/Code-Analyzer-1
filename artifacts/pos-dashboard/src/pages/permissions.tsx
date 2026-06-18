@@ -19,10 +19,9 @@ const MODULES = [
   { key: "inventory",         label: "Inventory" },
   { key: "transactions",      label: "Transactions" },
   { key: "analytics",         label: "Analytics" },
-  { key: "leads",             label: "Leads" },
   { key: "tasks",             label: "Tasks" },
   { key: "discount-requests", label: "Discount Requests" },
-  { key: "cashiers",          label: "Cashiers" },
+  { key: "cashiers",          label: "Cashiers / Admins" },
   { key: "shifts",            label: "Shifts" },
   { key: "transfers",         label: "Transfers" },
   { key: "audit",             label: "Audit Log" },
@@ -34,6 +33,11 @@ const MODULES = [
   { key: "units",             label: "Units" },
   { key: "shelves",           label: "Shelves" },
 ];
+
+const ROLE_FULL_ACCESS: Record<string, string> = {
+  admin:   "Admins have unrestricted access to every module — permissions cannot be configured for this role.",
+  manager: "Managers already have role-based access to all standard modules. Permission grants only apply to cashier accounts.",
+};
 
 const ACTIONS = [
   { key: "canView",    label: "View" },
@@ -177,7 +181,28 @@ export default function PermissionsPage() {
         </CardContent>
       </Card>
 
-      {selectedUser && (
+      {/* Role-based access notice — shown for admin/manager instead of permission grid */}
+      {selectedUser && selectedUserData && ROLE_FULL_ACCESS[selectedUserData.role] && (
+        <Card className="border-amber-200 bg-amber-50/60">
+          <CardContent className="p-5 flex items-start gap-3">
+            <Shield className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-sm text-amber-900 capitalize">{selectedUserData.role} — Full Access</p>
+              <p className="text-xs text-amber-700 mt-1">{ROLE_FULL_ACCESS[selectedUserData.role]}</p>
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                {MODULES.map(m => (
+                  <div key={m.key} className="flex items-center gap-1.5 text-xs text-amber-800">
+                    <Check className="w-3 h-3 text-amber-600 flex-shrink-0" />
+                    {m.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedUser && selectedUserData && !ROLE_FULL_ACCESS[selectedUserData.role] && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between flex-wrap gap-2">

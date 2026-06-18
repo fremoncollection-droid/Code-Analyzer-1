@@ -462,6 +462,18 @@ export default function POSPage() {
     setCart(prev => prev.map(c => c.itemId === itemId ? { ...c, quantity: Math.max(1, c.quantity + delta) } : c).filter(c => c.quantity > 0));
   }
 
+  function commitQtyEdit(itemId: string, val: string) {
+    const n = parseInt(val, 10);
+    if (!isNaN(n) && n >= 1) {
+      setCart(prev => prev.map(c => c.itemId === itemId ? { ...c, quantity: n } : c));
+    }
+    setQtyEditId(null);
+    setQtyEditVal("");
+  }
+
+  const [qtyEditId, setQtyEditId] = useState<string | null>(null);
+  const [qtyEditVal, setQtyEditVal] = useState("");
+
   function removeFromCart(itemId: string) {
     setCart(prev => prev.filter(c => c.itemId !== itemId));
   }
@@ -778,7 +790,28 @@ export default function POSPage() {
                 <button onClick={() => updateQty(item.itemId, -1)} className="w-7 h-7 rounded-md bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-95">
                   <Minus className="w-3 h-3" />
                 </button>
-                <span className="w-7 text-center text-xs font-bold tabular-nums">{item.quantity}</span>
+                {qtyEditId === item.itemId ? (
+                  <input
+                    type="number"
+                    min={1}
+                    autoFocus
+                    className="w-10 h-6 text-center text-xs font-bold tabular-nums border border-primary rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    value={qtyEditVal}
+                    onChange={e => setQtyEditVal(e.target.value)}
+                    onBlur={() => commitQtyEdit(item.itemId, qtyEditVal)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") { e.preventDefault(); commitQtyEdit(item.itemId, qtyEditVal); }
+                      if (e.key === "Escape") { setQtyEditId(null); setQtyEditVal(""); }
+                    }}
+                    onClick={e => e.stopPropagation()}
+                  />
+                ) : (
+                  <span
+                    className="w-7 h-6 flex items-center justify-center text-xs font-bold tabular-nums cursor-pointer hover:bg-primary/10 hover:text-primary rounded transition-colors select-none"
+                    title="Click to type quantity"
+                    onClick={() => { setQtyEditId(item.itemId); setQtyEditVal(String(item.quantity)); }}
+                  >{item.quantity}</span>
+                )}
                 <button onClick={() => updateQty(item.itemId, 1)} className="w-7 h-7 rounded-md bg-muted flex items-center justify-center hover:bg-muted/80 active:scale-95">
                   <Plus className="w-3 h-3" />
                 </button>
@@ -928,7 +961,28 @@ export default function POSPage() {
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => updateQty(item.itemId, -1)} className="w-8 h-8 rounded-md bg-muted flex items-center justify-center min-w-[32px] min-h-[32px]"><Minus className="w-3 h-3" /></button>
-                  <span className="w-6 text-center text-xs font-bold tabular-nums">{item.quantity}</span>
+                  {qtyEditId === item.itemId ? (
+                    <input
+                      type="number"
+                      min={1}
+                      autoFocus
+                      className="w-10 h-7 text-center text-xs font-bold tabular-nums border border-primary rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      value={qtyEditVal}
+                      onChange={e => setQtyEditVal(e.target.value)}
+                      onBlur={() => commitQtyEdit(item.itemId, qtyEditVal)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") { e.preventDefault(); commitQtyEdit(item.itemId, qtyEditVal); }
+                        if (e.key === "Escape") { setQtyEditId(null); setQtyEditVal(""); }
+                      }}
+                      onClick={e => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span
+                      className="w-8 h-8 flex items-center justify-center text-xs font-bold tabular-nums cursor-pointer hover:bg-primary/10 hover:text-primary rounded transition-colors select-none"
+                      title="Click to type quantity"
+                      onClick={() => { setQtyEditId(item.itemId); setQtyEditVal(String(item.quantity)); }}
+                    >{item.quantity}</span>
+                  )}
                   <button onClick={() => updateQty(item.itemId, 1)} className="w-8 h-8 rounded-md bg-muted flex items-center justify-center min-w-[32px] min-h-[32px]"><Plus className="w-3 h-3" /></button>
                 </div>
                 <div className="w-14 text-right">

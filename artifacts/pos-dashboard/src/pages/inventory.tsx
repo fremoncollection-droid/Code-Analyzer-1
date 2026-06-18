@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Edit2, Trash2, AlertTriangle, Package, TrendingUp, DollarSign, ShoppingBag, BarChart2, X, Filter, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, AlertTriangle, Package, TrendingUp, DollarSign, ShoppingBag, BarChart2, X, Filter, ChevronUp, ChevronDown, GripHorizontal } from "lucide-react";
 
 export default function InventoryPage() {
   const { selectedLocationId } = useAuth();
@@ -29,21 +29,31 @@ export default function InventoryPage() {
   const [tableHeight, setTableHeight] = useState(480);
   const dragState = useRef<{ startY: number; startH: number } | null>(null);
 
-  const onDragStart = useCallback((e: React.MouseEvent) => {
+  const onDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
-    dragState.current = { startY: e.clientY, startH: tableHeight };
-    const onMove = (ev: MouseEvent) => {
+    const startY = "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    dragState.current = { startY, startH: tableHeight };
+
+    const onMove = (ev: Event) => {
       if (!dragState.current) return;
-      const delta = ev.clientY - dragState.current.startY;
-      setTableHeight(Math.max(180, Math.min(1200, dragState.current.startH + delta)));
+      const clientY =
+        ev instanceof TouchEvent
+          ? ev.touches[0]?.clientY ?? dragState.current.startY
+          : (ev as MouseEvent).clientY;
+      const delta = clientY - dragState.current.startY;
+      setTableHeight(Math.max(180, Math.min(1400, dragState.current.startH + delta)));
     };
     const onUp = () => {
       dragState.current = null;
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onUp);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onMove, { passive: false } as any);
+    window.addEventListener("touchend", onUp);
   }, [tableHeight]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -219,13 +229,13 @@ export default function InventoryPage() {
 
         {/* Search + Filters */}
         <div className="space-y-3">
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search inventory..." className="pl-9" />
+              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search inventory..." className="pl-9 h-10" />
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-44 shrink-0">
+              <SelectTrigger className="sm:w-44 h-10">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
@@ -236,44 +246,53 @@ export default function InventoryPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
-              <Filter className="w-3.5 h-3.5" /> Missing:
+          {/* Filter chips — horizontal scroll on mobile, no wrapping */}
+          <div className="relative">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 pl-0.5">
+                <Filter className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Filter:</span>
+              </div>
+              {MISSING_OPTIONS.map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => setMissingFilter(missingFilter === opt.key ? null : opt.key)}
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${
+                    missingFilter === opt.key
+                      ? "bg-destructive/10 border-destructive/40 text-destructive"
+                      : "bg-muted/50 border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                  }`}
+                >
+                  {opt.label}
+                  {missingFilter === opt.key && <X className="inline w-3 h-3 ml-1 -mr-0.5" />}
+                </button>
+              ))}
+              {(categoryFilter !== "__all__" || missingFilter) && (
+                <button
+                  onClick={() => { setCategoryFilter("__all__"); setMissingFilter(null); }}
+                  className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border border-border text-muted-foreground hover:text-foreground"
+                >
+                  Clear all
+                </button>
+              )}
             </div>
-            {MISSING_OPTIONS.map(opt => (
-              <button
-                key={opt.key}
-                onClick={() => setMissingFilter(missingFilter === opt.key ? null : opt.key)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  missingFilter === opt.key
-                    ? "bg-destructive/10 border-destructive/40 text-destructive"
-                    : "bg-muted/50 border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
-                }`}
-              >
-                {opt.label}
-                {missingFilter === opt.key && <X className="inline w-3 h-3 ml-1 -mr-0.5" />}
-              </button>
-            ))}
-            {(categoryFilter !== "__all__" || missingFilter) && (
-              <button
-                onClick={() => { setCategoryFilter("__all__"); setMissingFilter(null); }}
-                className="px-2.5 py-1 rounded-full text-xs font-medium border border-border text-muted-foreground hover:text-foreground ml-auto"
-              >
-                Clear filters
-              </button>
-            )}
           </div>
         </div>
       </div>
 
-      {/* ── Drag handle ── */}
+      {/* ── Drag handle (mouse + touch) ── */}
       <div
-        className="group flex flex-col items-center gap-1 py-1 cursor-row-resize select-none"
+        className="group relative flex items-center justify-center cursor-row-resize select-none touch-none py-2"
         onMouseDown={onDragStart}
-        title="Drag to resize table"
+        onTouchStart={onDragStart}
+        aria-label="Drag to resize table"
       >
-        <div className="w-12 h-1 rounded-full bg-border group-hover:bg-teal-400 transition-colors duration-150" />
-        <div className="w-8 h-1 rounded-full bg-border/60 group-hover:bg-teal-300 transition-colors duration-150" />
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-border group-hover:bg-teal-300 group-active:bg-teal-400 transition-colors" />
+        <div className="relative z-10 flex items-center gap-1.5 px-3 py-1 rounded-full bg-background border border-border group-hover:border-teal-400 group-hover:text-teal-600 group-active:bg-teal-50 text-muted-foreground text-xs font-medium transition-all shadow-sm">
+          <GripHorizontal className="w-4 h-4" />
+          <span className="hidden sm:inline">Drag to resize table</span>
+          <span className="sm:hidden">Resize</span>
+        </div>
       </div>
 
       {/* ── Table (height draggable) ── */}
@@ -368,8 +387,8 @@ export default function InventoryPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(item)}><Edit2 className="w-3 h-3" /></Button>
-                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteItem.mutate({ id: item.id })}><Trash2 className="w-3 h-3" /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(item)} className="h-9 w-9 p-0 sm:h-8 sm:w-8"><Edit2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></Button>
+                        <Button size="sm" variant="ghost" className="h-9 w-9 p-0 sm:h-8 sm:w-8 text-destructive hover:text-destructive" onClick={() => deleteItem.mutate({ id: item.id })}><Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></Button>
                       </div>
                     </td>
                   </tr>
